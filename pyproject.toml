@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nu-wave"
+version = "0.1.0"
+description = "Python library for calculating flavour oscillation probability of neutrinos"
+authors = [
+  { name="Nadrino", email="adrien.blanchet@cern.ch" }
+]
+license = { text = "GNU LESSER GENERAL PUBLIC LICENSE v2.1" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "tensorflow-macos; platform_system=='Darwin'",
+  "tensorflow-metal; platform_system=='Darwin'",
+  "matplotlib",
+]
+
+[project.urls]
+Homepage = "https://github.com/nadrino/nu-waves"
+Repository = "https://github.com/nadrino/nu-waves"
+
