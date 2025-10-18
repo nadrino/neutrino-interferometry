@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 @dataclass
-class MixingParameters:
+class Mixing:
     """
     Generic N-flavor neutrino mixing matrix definition.
     Angles (theta) and phases (delta, majorana) must be given explicitly.
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49.0)}
     phases = {(1, 3): np.deg2rad(195)}
 
-    pmns = MixingParameters(dim=3, mixing_angles=angles, dirac_phases=phases)
+    pmns = Mixing(dim=3, mixing_angles=angles, dirac_phases=phases)
     U = pmns.U()
     print(np.round(U, 3))
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     # phases[(1,4)] = np.deg2rad(90) # \delta_{14}
     # phases[(2,4)] = np.deg2rad(0) # \delta_{24}
 
-    pmns_3p1 = MixingParameters(dim=4, mixing_angles=angles, dirac_phases=phases)
+    pmns_3p1 = Mixing(dim=4, mixing_angles=angles, dirac_phases=phases)
     U = pmns_3p1.U()
     print("U (3+1):")
     print(np.round(U, 3))

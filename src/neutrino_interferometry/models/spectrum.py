@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class Mass:
+class Spectrum:
     """
     Neutrino mass spectrum container.
 
@@ -175,7 +175,7 @@ class Mass:
 if __name__ == "__main__":
 
     print("Providing 2,1 and 3,1:")
-    spec = Mass(n=3, m_lightest=0.01)
+    spec = Spectrum(n=3, m_lightest=0.01)
     spec.set_dm2({
         (2, 1): 7.42e-5,
         (3, 1): 2.517e-3
@@ -187,7 +187,7 @@ if __name__ == "__main__":
 
     # coherence tests
     print("Providing 2,1 and 3,2:")
-    spec = Mass(n=3, m_lightest=0.01)
+    spec = Spectrum(n=3, m_lightest=0.01)
     spec.set_dm2({
         (2, 1): 7.42e-5,
         (3, 2): 0.0024428
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     print("Δm²_32 =", spec.get_dm2(3, 2))
 
     print("Providing 3,1 and 3,2:")
-    spec = Mass(n=3, m_lightest=0.01)
+    spec = Spectrum(n=3, m_lightest=0.01)
     spec.set_dm2({
         (3, 1): 2.517e-3,
         (3, 2): 0.0024428
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     print("Δm²_32 =", spec.get_dm2(3, 2))
 
     print("With sterile:")
-    spec = Mass(n=4, m_lightest=0.01)
+    spec = Spectrum(n=4, m_lightest=0.01)
     spec.set_dm2({
         (3, 1): 2.517e-3,
         (3, 2): 0.0024428,
