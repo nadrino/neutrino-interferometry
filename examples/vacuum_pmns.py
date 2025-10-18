@@ -16,9 +16,8 @@ print(np.round(U_pmns, 3))
 spec = Spectrum(n=3, m_lightest=0.)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 spec.summary()
-m2_diag = np.diag(spec.get_m2())
 
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_diag=m2_diag)
+osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 
 # Compute probabilities:
 # α = 1 (νμ source), β = [1,2,3] → (νμ, νe, ντ)
@@ -27,19 +26,18 @@ Enu_list = np.linspace(E_min, E_max, 200)
 P = osc.probability(
     L_km=295, E_GeV=Enu_list,
     alpha=flavors.muon,
-    # beta=[flavors.electron, flavors.muon, flavors.tau]
-    beta=flavors.muon
+    beta=[flavors.electron, flavors.muon, flavors.tau],
+    # antineutrino=True
 )
-print("P=", P)
 
 # ----------------------------------------------------------------------
 # Plotting
 # ----------------------------------------------------------------------
 plt.figure(figsize=(6.5, 4.0))
 
-plt.plot(Enu_list, P[:, 0], label=r"$P_{\mu e}$ appearance", lw=2)
-plt.plot(Enu_list, P[:, 1], label=r"$P_{\mu\mu}$ disappearance", lw=2)
-plt.plot(Enu_list, P[:, 2], label=r"$P_{\mu\tau}$ appearance", lw=2)
+plt.plot(Enu_list, P[:, flavors.electron], label=r"$P_{\mu e}$ appearance", lw=2)
+plt.plot(Enu_list, P[:, flavors.muon], label=r"$P_{\mu\mu}$ disappearance", lw=2)
+plt.plot(Enu_list, P[:, flavors.tau], label=r"$P_{\mu\tau}$ appearance", lw=2)
 plt.plot(Enu_list, P.sum(axis=1), "--", label="Total probability", lw=1.5)
 
 plt.xlabel(r"$E_\nu$ [GeV]")

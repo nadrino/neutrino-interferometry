@@ -11,12 +11,12 @@ class VacuumOscillator:
     ----------
     mixing_matrix : np.ndarray
         PMNS-like mixing matrix (N,N).
-    m2_diag : np.ndarray
+    m2_list : np.ndarray
         Mass-squared values [eV^2].
     """
 
-    def __init__(self, mixing_matrix: np.ndarray, m2_diag: np.ndarray):
-        self.hamiltonian = Hamiltonian(mixing_matrix, m2_diag)
+    def __init__(self, mixing_matrix: np.ndarray, m2_list: np.ndarray):
+        self.hamiltonian = Hamiltonian(mixing_matrix, m2_list)
 
     # ----------------------------------------------------------------------
 
@@ -55,14 +55,6 @@ class VacuumOscillator:
 
         # Hamiltonian and diagonalization
         H = self.hamiltonian.vacuum(E_GeV=E_GeV, antineutrino=antineutrino)     # (nE, N, N)
-
-        print("[probability] Enu shape:", np.asarray(E_GeV).shape,
-              "L shape:", np.asarray(L_km).shape,
-              "H shape:", H.shape)
-
-        # MUST satisfy ... x (N,N)
-        assert H.shape[-1] == H.shape[-2], f"H last two dims not square: {H.shape}"
-
         eigvals, eigvecs = np.linalg.eigh(H)   # (nE, N), (nE, N, N)
         N = eigvals.shape[1]
 
