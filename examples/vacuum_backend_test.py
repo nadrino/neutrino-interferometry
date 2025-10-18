@@ -106,7 +106,7 @@ if not disable_draw:
 
     plt.xlabel(r"$E_\nu$ [GeV]")
     plt.ylabel(r"Probability")
-    plt.title(r"T2K-like vacuum oscillation ($L=295\,\mathrm{km}$)")
+    plt.title(r"MPS!!")
     plt.xlim(E_min, E_max)
     plt.ylim(0, 1.05)
     plt.legend()

@@ -66,86 +66,24 @@ class VacuumOscillator:
             # --- original path (no overhead) ---
             E_flat = Ec.reshape(-1)                                   # (B,)
             L_flat = Lc.reshape(-1)                                   # (B,)
-            H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (B,N,N)
-
-            xp, linalg = self.backend.xp, self.backend.linalg
-            KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
-            j = xp.asarray(1j, dtype=self.backend.dtype_complex)
-
-            # use_matrix_exp = hasattr(linalg, "matrix_exp")
-            use_matrix_exp = False
-
-            if use_matrix_exp:
-                # Direct propagator: S = exp(-i H L)
-                # HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]  # (B,N,N)
-                # S = linalg.matrix_exp((-j) * HL)  # (B,N,N)
-
-                KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
-                j = xp.asarray(1j, dtype=self.backend.dtype_complex)
-
-                HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
-                S = linalg.matrix_exp((-j) * HL)  # NumPy: eig-based; Torch: native/CPU fallback
-
-            else:
-                # Eigen path (your existing code)
-                eigvals, eigvecs = linalg.eigh(H)  # (B,N),(B,N,N)
-                phase = xp.exp((-j) * eigvals * (L_flat * KM)[:, xp.newaxis])  # (B,N)
-                S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, xp.conj(eigvecs))  # (B,N,N)
-
-                # After eig:
-                I = xp.eye(eigvecs.shape[-1], dtype=self.backend.dtype_complex)
-                VHV = xp.einsum("...ki,...kj->...ij", xp.conj(eigvecs), eigvecs)  # V^† V
-                print("max ||V^†V - I||:", float(self.backend.from_device(xp.abs(VHV - I).max())))
-
-                # Compare eig reconstruction vs matrix exponential for a tiny batch (debug only)
-                if hasattr(self.backend, "matrix_exp"):
-                    KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
-                    j = xp.asarray(1j, dtype=self.backend.dtype_complex)
-                    HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
-                    S_exp = self.backend.matrix_exp((-j) * HL)  # direct matrix exp
-                    diff = xp.abs(S - S_exp).max()
-                    print("max |S_eig - S_exp|:", float(self.backend.from_device(diff)))
-
-            # eigvals, eigvecs = linalg.eigh(H)
-            #
-            # # phase = xp.exp(-1j * eigvals * (L_flat * KM)[:, None]) # (B,N)
-            # # S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj()) # (B,N,N)
-            #
-            # # (B,N),(B,N,N)
-            # phase = xp.exp((-j) * eigvals * (L_flat * KM)[:, xp.newaxis])
-            # # Immediately after computing `phase`:
-            # arg = eigvals * (L_flat * KM)[:, xp.newaxis]  # real argument before multiplying by -i
-            # # On NumPy:
-            # print("max |arg| (NumPy):", np.max(np.abs(self.backend.from_device(arg))))
-            # # On Torch:
-            # print("max |arg| (Torch):", np.max(np.abs(self.backend.from_device(arg))))
-            # print("eigvals:", eigvals.dtype, "phase:", phase.dtype)
-            # S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, xp.conj(eigvecs))
-            P = (xp.abs(S) ** 2).reshape(*center_shape, S.shape[-2], S.shape[-1]) # S+(N,N)
         else:
             # --- smeared path ---
             ns = int(max(1, self.n_samples))
-
-            # def _tile(x):
-            #     return xp.repeat_last(x, ns)  # instead of np.repeat(..., axis=-1)
-            #
-            def _tile(x):
-                return xp.repeat_last(x, ns)
-
+            def _tile(x): return xp.repeat_last(x, ns)
             Es = self.energy_sampler(Ec, ns) if self.energy_sampler else _tile(Ec)  # S+(ns,)
             Ls = self.baseline_sampler(Lc, ns) if self.baseline_sampler else _tile(Lc)
-
             E_flat = Es.reshape(-1)
             L_flat = Ls.reshape(-1)
 
-            H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (S*ns,N,N)
-            eigvals, eigvecs = xp.linalg.eigh(H)
-            KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
-            j = xp.asarray(1j, dtype=self.backend.dtype_complex)  # backend-typed i
-            phase = xp.exp((-j) * eigvals * (L_flat * KM)[:, xp.newaxis])
-            # phase = xp.exp(-1j * eigvals * (L_flat * KM)[:, None])
-            # S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj())       # (S*ns,N,N)
-            S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, xp.conj(eigvecs))
+        H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (S*ns,N,N)
+        # extra safe
+        KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
+        HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
+        S = linalg.matrix_exp((-1j) * HL)  # NumPy: eig-based; Torch: native/CPU fallback
+
+        if not use_sampling:
+            P = (xp.abs(S) ** 2).reshape(*center_shape, S.shape[-2], S.shape[-1])  # S+(N,N)
+        else:
             P = (xp.abs(S) ** 2).reshape(*center_shape, ns, S.shape[-2], S.shape[-1]).mean(axis=-3)  # S+(N,N)
 
         # ---------- squeeze scalar axes like before ----------

@@ -10,13 +10,18 @@ class _NumpyXP:
 class _NumpyLinalg:
     @staticmethod
     def eigh(A):
-        return _np.linalg.eigh(A)  # batched
+        return _np.linalg.eigh(A)  # batched OK
+
     @staticmethod
     def matrix_exp(A):
-        # A: (..., N, N), Hermitian
-        w, V = _np.linalg.eigh(A)                 # w: (..., N), V: (..., N, N)
-        ew = _np.exp(w)                           # (..., N)
-        V_scaled = V * ew[..., _np.newaxis, :]    # scale columns by exp(eigs)
+        """
+        Exp for skew-Hermitian A (our use case: A = -i * H * L, with H Hermitian).
+        Uses: exp(A) = V diag(exp(-i * w)) V^† where iA = V diag(w) V^†, w real.
+        """
+        B = 1j * A                                # iA is Hermitian
+        w, V = _np.linalg.eigh(B)                 # (..., N), (..., N, N)
+        ew = _np.exp(-1j * w)                     # (..., N), complex
+        V_scaled = V * ew[..., _np.newaxis, :]    # scale columns
         return V_scaled @ V.conj().swapaxes(-1, -2)
 
 def make_numpy_backend(seed: int | None = None) -> ArrayBackend:
