@@ -59,15 +59,12 @@ class VacuumOscillator:
         N = eigvals.shape[1]
 
         # Build propagators for all (L,E)
-        L_phase = (L_km[:, None, None] * KM_TO_EVINV)  # (nL,1,1)
-        phase = np.exp(-1j * eigvals[None, :, :] * L_phase)  # (nL,nE,N)
+        L = np.atleast_1d(L_km).astype(float) * KM_TO_EVINV      # (nL,)
+        phase = np.exp(-1j * eigvals[None, :, :] * L[:, None, None])  # (nL, nE, N)
 
-        # Reconstruct S_{βα}(L,E)
-        S = np.einsum("eik,lek->lei k", eigvecs, phase) @ np.conjugate(eigvecs[:, None, :, :])
-        # Shape (nL,nE,N,N)
-
-        # --- up to here you have P of shape (nL, nE, N, N) ---
-        P = np.abs(S) ** 2  # (nL, nE, N, N)
+        # S[l, e, i, j] = sum_k V[e,i,k] * phase[l,e,k] * V[e,j,k]^*
+        S = np.einsum('eik,lek,ejk->leij', eigvecs, phase, eigvecs.conj())
+        P = np.abs(S) ** 2  # trailing axes are (..., beta=i, alpha=j)
 
         # Remember whether inputs were scalars
         L_is_scalar = np.ndim(L_km) == 0 or (np.ndim(L_km) == 1 and np.size(L_km) == 1)
@@ -106,6 +103,13 @@ class VacuumOscillator:
             return P[..., b, a]  # -> (nE, len(beta)) or (nL, len(beta))
         if not a_scalar and b_scalar:
             return P[..., b, a]  # -> (nE, len(alpha)) or (nL, len(alpha))
+
+        # # E -> infinity limit: should go to identity
+        # P_hiE = self.probability(L_km=L_km, E_GeV=1e6, alpha=None, beta=None)
+        # assert np.allclose(P_hiE, np.eye(P_hiE.shape[-1])[None, None, ...], atol=1e-12)
+        #
+        # # Unitarity: sum over beta must be 1
+        # assert np.allclose(P.sum(axis=-2), 1.0, atol=1e-12)
 
         # both arrays → Cartesian selection
         return P[..., np.ix_(b, a)]  # -> (..., len(beta), len(alpha))
