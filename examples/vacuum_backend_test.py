@@ -54,6 +54,21 @@ P_np = osc_np.probability(L_km=295, E_GeV=np.linspace(0.2,2.0,200), alpha=1, bet
 osc_mps = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=make_torch_mps_backend(seed=0))
 P_mps = osc_mps.probability(L_km=295, E_GeV=np.linspace(0.2,2.0,200), alpha=1, beta=1)
 
+# 1) Check dtype/device of the key tensors on MPS
+print("eigvals dtype:", osc_mps.backend.from_device(osc_mps.backend.xp.asarray(0)).dtype)  # sanity
+
+# 2) High-E identity on both backends
+E_hi = np.array([1e6])
+P_np_hi  = osc_np.probability(L_km=295, E_GeV=E_hi, alpha=None, beta=None)
+P_mps_hi = osc_mps.probability(L_km=295, E_GeV=E_hi, alpha=None, beta=None)
+np.testing.assert_allclose(P_np_hi, torch_backend.from_device(P_mps_hi), rtol=1e-4, atol=1e-5)
+
+# 3) Unitarity on MPS alone (catches phase mishandling)
+E = np.linspace(0.2, 2.0, 200)
+P_mps_full = osc_mps.probability(L_km=295, E_GeV=E, alpha=None, beta=None)
+np.testing.assert_allclose(torch_backend.from_device(P_mps_full).sum(axis=-2), 1.0, atol=2e-6)
+
+
 # compare (looser tolerances for complex64)
 np.testing.assert_allclose(P_np, torch_backend.from_device(P_mps), rtol=5e-4, atol=5e-5)
 

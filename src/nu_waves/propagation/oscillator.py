@@ -69,8 +69,12 @@ class VacuumOscillator:
             H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (B,N,N)
             eigvals, eigvecs = linalg.eigh(H)                            # (B,N),(B,N,N)
             KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
-            phase = xp.exp(-1j * eigvals * (L_flat * KM)[:, None]) # (B,N)
-            S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj()) # (B,N,N)
+            # phase = xp.exp(-1j * eigvals * (L_flat * KM)[:, None]) # (B,N)
+            j = xp.asarray(1j, dtype=self.backend.dtype_complex)  # backend-typed i
+            phase = xp.exp((-j) * eigvals * (L_flat * KM)[:, xp.newaxis])
+            print("eigvals:", eigvals.dtype, "phase:", phase.dtype)
+            # S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj()) # (B,N,N)
+            S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, xp.conj(eigvecs))
             P = (xp.abs(S) ** 2).reshape(*center_shape, S.shape[-2], S.shape[-1]) # S+(N,N)
         else:
             # --- smeared path ---
@@ -91,8 +95,11 @@ class VacuumOscillator:
             H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (S*ns,N,N)
             eigvals, eigvecs = xp.linalg.eigh(H)
             KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
-            phase = xp.exp(-1j * eigvals * (L_flat * KM)[:, None])
-            S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj())       # (S*ns,N,N)
+            j = xp.asarray(1j, dtype=self.backend.dtype_complex)  # backend-typed i
+            phase = xp.exp((-j) * eigvals * (L_flat * KM)[:, xp.newaxis])
+            # phase = xp.exp(-1j * eigvals * (L_flat * KM)[:, None])
+            # S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj())       # (S*ns,N,N)
+            S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, xp.conj(eigvecs))
             P = (xp.abs(S) ** 2).reshape(*center_shape, ns, S.shape[-2], S.shape[-1]).mean(axis=-3)  # S+(N,N)
 
         # ---------- squeeze scalar axes like before ----------

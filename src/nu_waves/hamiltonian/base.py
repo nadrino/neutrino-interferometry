@@ -38,7 +38,8 @@ class Hamiltonian:
         E_eV = E * GEV_TO_EV
         U = xp.conjugate(self.U) if antineutrino else self.U
         # (U * m2) @ U^†  (scale columns by m2)
-        H0 = (U * self.m2_diag[xp.newaxis, :]) @ xp.conjugate(U).T  # (N,N)
+        # H0 = (U * self.m2_diag[xp.newaxis, :]) @ xp.conjugate(U).T  # (N,N)
+        H0 = (U * self.m2_diag[xp.newaxis, :]) @ xp.swapaxes(xp.conj(U), -1, -2)
         H = H0 / (2.0 * E_eV[..., xp.newaxis, xp.newaxis])  # ()→(N,N) or (nE,N,N)
         return H
 
