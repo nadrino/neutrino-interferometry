@@ -40,3 +40,39 @@ print(np.max(np.abs(P_AB - P_BA)))
 assert np.max(np.abs(P_AB - P_BA)) > 1e-3
 
 
+print("One layer should correspond to constant matter density")
+
+# DUNE-like config
+L_km = 1300.0
+E = np.linspace(0.3, 5.0, 250)
+rho, Ye = 2.8, 0.5
+
+# --- constant-density path ---
+osc.set_constant_density(rho_gcm3=rho, Ye=Ye)
+P_cd = osc.probability(L_km=L_km, E_GeV=E, alpha=None, beta=None)
+osc.use_vacuum()
+
+# --- single-layer profile (identical physical parameters) ---
+profile = MatterProfile.from_fractions([rho], [Ye], [1.0])
+osc.set_layered_profile(profile)
+P_1l = osc.probability(L_km=L_km, E_GeV=E, alpha=None, beta=None)
+
+# --- compare ---
+np.testing.assert_allclose(P_cd, P_1l, atol=1e-10)
+print("✅  One-layer profile reproduces constant-density result")
+
+# # --- optional: repeat on MPS backend ---
+# try:
+#     from nu_waves.backends import make_torch_mps_backend
+#     torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+#     osc_mps = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
+#     profile = MatterProfile.from_fractions([rho], [Ye], [1.0])
+#     osc_mps.set_layered_profile(profile)
+#     P_mps = osc_mps.probability(L_km=L_km, E_GeV=E, alpha=None, beta=None)
+#     P_mps_np = torch_backend.from_device(P_mps)
+#     np.testing.assert_allclose(P_cd, P_mps_np, rtol=5e-4, atol=5e-5)
+#     print("✅  MPS one-layer parity OK")
+# except Exception as e:
+#     print(f"⚠️  MPS backend test skipped or failed: {e}")
+
+
