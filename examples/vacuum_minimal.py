@@ -1,8 +1,8 @@
 import numpy as np
-from neutrino_interferometry.models.mixing import Mixing
-from neutrino_interferometry.models.spectrum import Spectrum  # ta classe
-from neutrino_interferometry.hamiltonian.base import Hamiltonian
-import neutrino_interferometry.propagation.solvers as solvers
+from nu_waves.models.mixing import Mixing
+from nu_waves.models.spectrum import Spectrum  # ta classe
+from nu_waves.hamiltonian.base import Hamiltonian
+import nu_waves.propagation.solvers as solvers
 
 # 3 saveurs (exemple)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49.0)}

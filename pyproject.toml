@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "neutrino_interferometry"
+name = "nu_waves"
 version = "0.1.0"
 description = "Python library for calculating flavour oscillation probability of neutrinos"
 authors = [
