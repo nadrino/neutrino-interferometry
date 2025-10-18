@@ -25,6 +25,15 @@ spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
 osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
 
+L = 8000.0
+E = np.linspace(1, 10, 400)
+P_NO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0)              # neutrinos, NO
+P_IO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0, antineutrino=True)  # ν̄ in IO has the resonance
+
+P_NO = torch_backend.from_device(P_NO)
+P_IO = torch_backend.from_device(P_IO)
+print("P_mu->e max (NO, ν):", P_NO.max(), "  P_mu->e max (IO, ν̄):", P_IO.max())
+
 E_GeV = np.logspace(-1, 2, 400)     # x
 cosz  = np.linspace(-1.0, 1.0, 240)     # y (upgoing)
 prem  = PREMModel()
@@ -58,9 +67,13 @@ def draw(ax, X, Y, Z, title):
     im = ax.imshow(Z, origin="lower", aspect="auto",
                    extent=[X.min(), X.max(), Y.min(), Y.max()],
                    vmin=0.0, vmax=1.0, interpolation="nearest", cmap='inferno')
+    E_edges = np.geomspace(0.1, 100.0, len(E_GeV) + 1)
+    E_centers = np.sqrt(E_edges[:-1] * E_edges[1:])  # compute P on centers
+    CZ_edges = np.linspace(-1.0, 1.0, len(cosz) + 1)
+    pc = ax.pcolormesh(E_edges, CZ_edges, Z, vmin=0, vmax=1, shading="auto")
+    ax.set_xscale('log')
     ax.set_xlabel(r"$E_\nu$ [GeV]")
     ax.set_ylabel(r"$\cos\theta_z$")
-    ax.set_xscale('log')
     ax.set_title(title)
     cbar = plt.colorbar(im, ax=ax, pad=0.01)
     cbar.set_label("Probability")
