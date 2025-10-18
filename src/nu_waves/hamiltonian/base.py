@@ -11,12 +11,12 @@ class Hamiltonian:
         self.U = mixing_matrix
         self.m2_diag = m2_diag
 
-    def vacuum(self, E: float | np.ndarray) -> np.ndarray:
+    def vacuum(self, E_in_GeV: float | np.ndarray) -> np.ndarray:
         """
         H_f(E) = U diag(m^2)/(2E) U^†
         E: scalar or array (GeV); returns (N,N) if scalar, (nE,N,N) otherwise.
         """
-        E = np.asarray(E, dtype=float)
-        D = self.m2_diag / (2.0 * E[..., None, None] * GEV_TO_EV)  # broadcast sur E
+        E_in_GeV = np.asarray(E_in_GeV, dtype=float)
+        D = self.m2_diag / (2.0 * E_in_GeV[..., None, None] * GEV_TO_EV)  # broadcast sur E
         return self.U @ D @ self.U.conj().T
 
