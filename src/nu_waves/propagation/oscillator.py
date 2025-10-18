@@ -1,6 +1,7 @@
 import numpy as np
 from nu_waves.hamiltonian.base import Hamiltonian
 from nu_waves.backends import make_numpy_backend
+from nu_waves.matter.profile import MatterProfile
 from nu_waves.utils.units import KM_TO_EVINV
 
 
@@ -36,12 +37,17 @@ class VacuumOscillator:
         self.n_samples = n_samples
 
     def set_constant_density(self, rho_gcm3: float, Ye: float = 0.5):
-        self._use_matter_constant = True
+        self._use_matter = True
         self._matter_args = (float(rho_gcm3), float(Ye))
 
+    def set_layered_profile(self, profile: MatterProfile):
+        self._use_matter = True
+        self._matter_profile = profile
+
     def use_vacuum(self):
-        self._use_matter_constant = False
+        self._use_matter = False
         self._matter_args = None
+        self._matter_profile = None
 
     # ----------------------------------------------------------------------
     def probability(self,
@@ -83,21 +89,47 @@ class VacuumOscillator:
             E_flat = Es.reshape(-1)
             L_flat = Ls.reshape(-1)
 
-        if getattr(self, "_use_matter_constant", False):
-            rho, Ye = self._matter_args  # set via helper
-            H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
+
+        KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
+
+        if getattr(self, "_use_matter", False):
+
+            if getattr(self, "_matter_profile", None) is None:
+                # constant matter density
+                rho, Ye = self._matter_args  # set via helper
+                H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
+                HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
+                S = linalg.matrix_exp((-1j) * HL)
+            else:
+                # layered profile
+                prof = self._matter_profile
+                # per-center ΔL_k arrays, each shaped like L_flat (broadcast-safe across grid or pairs)
+                dL_list = prof.resolve_dL(self.backend.from_device(L_flat))  # resolve in host float
+                dL_list = [xp.asarray(dL, dtype=self.backend.dtype_real) for dL in dL_list]
+
+                # accumulate S_tot = S_K @ ... @ S_1 (source→detector order = list order)
+                N = self.hamiltonian.U.shape[0]
+                S = xp.eye(N, dtype=self.backend.dtype_complex)[xp.newaxis, ...]  # (1,N,N) seed
+                S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()  # (B,N,N) identities
+
+                for k, layer in enumerate(prof.layers):
+                    Hk = self.hamiltonian.matter_constant(E_flat,
+                                                          rho_gcm3=layer.rho_gcm3,
+                                                          Ye=layer.Ye,
+                                                          antineutrino=antineutrino)  # (B,N,N)
+                    HLk = Hk * (dL_list[k] * KM)[:, xp.newaxis, xp.newaxis]  # (B,N,N)
+                    Sk = linalg.matrix_exp((-1j) * HLk)  # (B,N,N)
+                    S = Sk @ S  # pre-multiply: S_tot = S_k * S_tot
         else:
             H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino) # (S*ns,N,N)
-
-        # H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (S*ns,N,N)
-        # extra safe
-        KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
-        HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
-        S = linalg.matrix_exp((-1j) * HL)  # NumPy: eig-based; Torch: native/CPU fallback
+            HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
+            S = linalg.matrix_exp((-1j) * HL)
 
         if not use_sampling:
+            # using true
             P = (xp.abs(S) ** 2).reshape(*center_shape, S.shape[-2], S.shape[-1])  # S+(N,N)
         else:
+            # smearings
             P = (xp.abs(S) ** 2).reshape(*center_shape, ns, S.shape[-2], S.shape[-1]).mean(axis=-3)  # S+(N,N)
 
         # ---------- squeeze scalar axes like before ----------
