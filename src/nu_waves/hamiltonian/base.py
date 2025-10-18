@@ -2,12 +2,12 @@ import numpy as np
 
 
 class Hamiltonian:
-    def __init__(self, U: np.ndarray, m2_diag: np.ndarray):
+    def __init__(self, mixing_matrix: np.ndarray, m2_diag: np.ndarray):
         """
         U: (N,N) complex PMNS (ou 3+N)
         m2_diag: (N,N) diag(m_i^2) [eV^2]
         """
-        self.U = U
+        self.U = mixing_matrix
         self.m2_diag = m2_diag
 
     def vacuum(self, E: float | np.ndarray) -> np.ndarray:

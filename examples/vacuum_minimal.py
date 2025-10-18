@@ -4,15 +4,15 @@ from nu_waves.models.spectrum import Spectrum  # ta classe
 from nu_waves.hamiltonian.base import Hamiltonian
 import nu_waves.propagation.solvers as solvers
 
-# 3 saveurs (exemple)
+# 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49.0)}
 phases = {(1, 3): np.deg2rad(195)}
-
 pmns = Mixing(dim=3, mixing_angles=angles, dirac_phases=phases)
-U = pmns.U()
-print(np.round(U, 3))
+U_pmns = pmns.get_mixing_matrix()
+print(np.round(U_pmns, 3))
 
-spec = Spectrum(n=3, m_lightest=0.01)
+# Masses, normal ordering
+spec = Spectrum(n=3, m_lightest=0.)
 spec.set_dm2({
     (2, 1): 7.42e-5,
     (3, 2): 0.0024428
@@ -20,10 +20,11 @@ spec.set_dm2({
 spec.summary()
 m2_diag = np.diag(spec.get_m2())
 
-hamiltonian = Hamiltonian(U=U, m2_diag=m2_diag)
+
+hamiltonian = Hamiltonian(mixing_matrix=U_pmns, m2_diag=m2_diag)
 
 # Grille d’énergies et baseline
-E = np.linspace(0.2, 5.0, 200)   # GeV
+E = np.linspace(0.2, 3.0, 200)   # GeV
 L = 295e3                        # m (T2K-like)
 
 H_E = hamiltonian.vacuum(E)                # (nE,N,N)
