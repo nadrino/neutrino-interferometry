@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum  # ta classe
 from nu_waves.hamiltonian.base import Hamiltonian
@@ -31,16 +32,13 @@ H_E = hamiltonian.vacuum(E)                # (nE,N,N)
 S_E = solvers.propagator_vacuum(H_E, L)  # (nE,N,N)
 
 # Probabilité ν_μ → ν_e
-P_mue = solvers.probability_alpha_to_beta(S_E, alpha=2, beta=1)
-print("P(νμ→νe) size:", P_mue.shape)
-
-import matplotlib.pyplot as plt
+P_dis = solvers.probability_alpha_to_beta(S_E, alpha=2, beta=2)
 
 plt.figure(figsize=(6,4))
-plt.plot(E, P_mue, lw=2)
+plt.plot(E, P_dis, lw=2)
 plt.xlabel("Neutrino energy $E$ [GeV]")
-plt.ylabel(r"$P(\nu_\mu \to \nu_e)$")
-plt.title("Vacuum oscillation probability")
+plt.ylabel(r"$P(\nu_\mu \to \nu_\mu)$")
+plt.title("Vacuum oscillation probability probability")
 plt.grid(True, ls="--", alpha=0.5)
 plt.tight_layout()
 plt.show()
