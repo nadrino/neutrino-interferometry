@@ -1,4 +1,4 @@
-from nu_waves.models.mass import Mass
+from neutrino_interferometry.models.mass import Mass
 import numpy as np
 
 print("Normal ordering (Δm31² > 0)")
