@@ -31,7 +31,7 @@ P_dis_test = solvers.probability_alpha_to_beta(
         hamiltonian.vacuum(0.6),
         295
     ),
-    alpha=2, beta=2
+    alpha=1, beta=1
 )
 print("P(survival nu_mu, 0.6 GeV, 295 km)", P_dis_test)
 
@@ -42,7 +42,7 @@ P_dis = solvers.probability_alpha_to_beta(
         hamiltonian.vacuum(Enu_list),
         295
     ),
-    alpha=2, beta=2
+    alpha=1, beta=1
 )
 plt.figure(figsize=(6,4))
 plt.plot(Enu_list, P_dis, lw=2)
@@ -53,12 +53,23 @@ plt.grid(True, ls="--", alpha=0.5)
 plt.tight_layout()
 plt.show()
 
+
+osc = VacuumOscillator(mixing_matrix=U_pmns, m2_diag=m2_diag)
+
+P_full = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,5))
+print(P_full, P_full.shape)
+assert P_full.shape == (5, 3, 3)
+print("P_full OK")
+
+P_b = osc.probability(alpha=0, beta=[0,1,2], L_km=[295], E_GeV=[0.6,0.8])
+print(P_b)
+assert P_b.shape == (2, 3)
+print("P_b OK")
+
+
 # Compute probabilities:
 # α = 1 (νμ source), β = [1,2,3] → (νμ, νe, ντ)
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_diag=m2_diag)
-P = osc.probability(L_km=295, E_GeV=Enu_list, alpha=0, beta=np.array([0, 1, 2]))
-# shape (nL, nE, 3) → squeeze L
-# P = P.squeeze(0)
+P = osc.probability(L_km=295, E_GeV=Enu_list, alpha=1, beta=np.array([0, 1, 2]))
 print("P=", P)
 
 # ----------------------------------------------------------------------
@@ -66,8 +77,9 @@ print("P=", P)
 # ----------------------------------------------------------------------
 plt.figure(figsize=(6.5, 4.0))
 
-plt.plot(Enu_list, P[:, 2], label=r"$P_{\mu\mu}$ disappearance", lw=2)
-plt.plot(Enu_list, P[:, 3], label=r"$P_{\mu e}$ appearance", lw=2)
+plt.plot(Enu_list, P[:, 0], label=r"$P_{\mu e}$ appearance", lw=2)
+plt.plot(Enu_list, P[:, 1], label=r"$P_{\mu\mu}$ disappearance", lw=2)
+plt.plot(Enu_list, P[:, 2], label=r"$P_{\mu\tau}$ appearance", lw=2)
 plt.plot(Enu_list, P.sum(axis=1), "--", label="Total probability", lw=1.5)
 
 plt.xlabel(r"$E_\nu$ [GeV]")

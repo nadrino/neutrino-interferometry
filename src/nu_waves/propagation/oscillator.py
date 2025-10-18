@@ -62,18 +62,47 @@ class VacuumOscillator:
         S = np.einsum("eik,lek->lei k", eigvecs, phase) @ np.conjugate(eigvecs[:, None, :, :])
         # Shape (nL,nE,N,N)
 
-        P = np.abs(S) ** 2  # (nL,nE,N,N)
+        # --- up to here you have P of shape (nL, nE, N, N) ---
+        P = np.abs(S) ** 2  # (nL, nE, N, N)
 
-        # Handle flavor selection
+        # Remember whether inputs were scalars
+        L_is_scalar = np.ndim(L_km) == 0 or (np.ndim(L_km) == 1 and np.size(L_km) == 1)
+        E_is_scalar = np.ndim(E_GeV) == 0 or (np.ndim(E_GeV) == 1 and np.size(E_GeV) == 1)
+
+        # Squeeze the axes that were scalar in the inputs
+        if L_is_scalar and E_is_scalar:
+            P = P[0, 0]  # -> (N, N)
+        elif L_is_scalar:
+            P = P[0]  # -> (nE, N, N)
+        elif E_is_scalar:
+            P = P[:, 0]  # -> (nL, N, N)
+
+        # else keep (nL, nE, N, N)
+
+        # ---- Robust flavor selection (keeps expected shapes) ----
+        def _as_idx(x, N):
+            if x is None:
+                return np.arange(N)
+            x = np.asarray(x)
+            return int(x) if x.ndim == 0 else x
+
+        N = P.shape[-1]  # trailing axes are (beta, alpha)
+        a = _as_idx(alpha, N)
+        b = _as_idx(beta, N)
+
         if alpha is None and beta is None:
-            return P  # full tensor (nL,nE,N,N)
+            return P  # (nE,N,N), (nL,N,N), (N,N), or (nL,nE,N,N)
 
-        alpha = np.atleast_1d(alpha)
-        beta = np.atleast_1d(beta)
+        a_scalar = np.isscalar(a)
+        b_scalar = np.isscalar(b)
 
-        P_sel = P[..., beta[:, None], alpha[None, :]]  # (nL,nE,len(beta),len(alpha))
+        if a_scalar and b_scalar:
+            return P[..., b, a]  # -> (nE), (nL), or scalar
+        if a_scalar and not b_scalar:
+            return P[..., b, a]  # -> (nE, len(beta)) or (nL, len(beta))
+        if not a_scalar and b_scalar:
+            return P[..., b, a]  # -> (nE, len(alpha)) or (nL, len(alpha))
 
-        # Simplify shape if single indices
-        if P_sel.shape[-2:] == (1, 1):
-            return P_sel[..., 0, 0]
-        return np.squeeze(P_sel)
+        # both arrays → Cartesian selection
+        return P[..., np.ix_(b, a)]  # -> (..., len(beta), len(alpha))
+
