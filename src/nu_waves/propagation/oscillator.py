@@ -39,10 +39,12 @@ class VacuumOscillator:
     def set_constant_density(self, rho_gcm3: float, Ye: float = 0.5):
         self._use_matter = True
         self._matter_args = (float(rho_gcm3), float(Ye))
+        self._matter_profile = None
 
     def set_layered_profile(self, profile: MatterProfile):
         self._use_matter = True
         self._matter_profile = profile
+        self._matter_args = None
 
     def use_vacuum(self):
         self._use_matter = False
