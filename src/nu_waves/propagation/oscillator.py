@@ -76,6 +76,9 @@ class VacuumOscillator:
             # --- smeared path ---
             ns = int(max(1, self.n_samples))
 
+            # def _tile(x):
+            #     return xp.repeat_last(x, ns)  # instead of np.repeat(..., axis=-1)
+            #
             def _tile(x):
                 return xp.repeat_last(x, ns)
 
