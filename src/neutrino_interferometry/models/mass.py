@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Mass:
     """
     Neutrino mass spectrum container.
