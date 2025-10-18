@@ -22,8 +22,16 @@ class Hamiltonian:
             If True, uses complex-conjugated mixing matrix (U*).
         """
         E_eV = np.asarray(E_GeV, dtype=float) * GEV_TO_EV
+
         U = np.conjugate(self.U) if antineutrino else self.U
+        # --- early sanity checks ---
+        print("[vacuum] E_GeV shape:", np.asarray(E_GeV).shape, "-> E_eV shape:", E_eV.shape)
+        print("[vacuum] U shape:", U.shape, "dtype:", U.dtype)
+        print("[vacuum] m2_diag shape:", np.asarray(self.m2_diag).shape, "dtype:", np.asarray(self.m2_diag).dtype)
+
         D = np.diag(self.m2_diag)
         H = U @ D @ U.conj().T
         H = H / (2.0 * E_eV[..., None, None])  # broadcast over E
+        print("[vacuum] H shape:", H.shape, "Hermiticity max|H-H^†|=",
+              np.max(np.abs(H - np.swapaxes(H.conj(), -1, -2))))
         return H

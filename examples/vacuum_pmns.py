@@ -24,7 +24,12 @@ osc = VacuumOscillator(mixing_matrix=U_pmns, m2_diag=m2_diag)
 # α = 1 (νμ source), β = [1,2,3] → (νμ, νe, ντ)
 E_min, E_max = 0.2, 3.0
 Enu_list = np.linspace(E_min, E_max, 200)
-P = osc.probability(L_km=295, E_GeV=Enu_list, alpha=flavors.muon, beta=np.array([flavors.electron, flavors.muon, flavors.tau]))
+P = osc.probability(
+    L_km=295, E_GeV=Enu_list,
+    alpha=flavors.muon,
+    # beta=[flavors.electron, flavors.muon, flavors.tau]
+    beta=flavors.muon
+)
 print("P=", P)
 
 # ----------------------------------------------------------------------
