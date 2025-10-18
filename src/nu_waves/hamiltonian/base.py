@@ -35,11 +35,16 @@ class Hamiltonian:
         xp = self.backend.xp
         E = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
         E = E.reshape(()) if E.ndim == 0 else E.reshape(-1)  # () or (nE,)
-        E_eV = E * GEV_TO_EV
+
+        EV_PER_GEV = self.backend.xp.asarray(GEV_TO_EV, dtype=self.backend.dtype_real)
+        E_eV = E * EV_PER_GEV
+        # E_eV = E * GEV_TO_EV
+
         U = xp.conjugate(self.U) if antineutrino else self.U
         # (U * m2) @ U^†  (scale columns by m2)
         # H0 = (U * self.m2_diag[xp.newaxis, :]) @ xp.conjugate(U).T  # (N,N)
-        H0 = (U * self.m2_diag[xp.newaxis, :]) @ xp.swapaxes(xp.conj(U), -1, -2)
+        # H0 = (U * self.m2_diag[xp.newaxis, :]) @ xp.swapaxes(xp.conj(U), -1, -2)
+        H0 = (U * self.m2_diag[self.backend.xp.newaxis, :]) @ self.backend.xp.swapaxes(self.backend.xp.conj(U), -1, -2)
         H = H0 / (2.0 * E_eV[..., xp.newaxis, xp.newaxis])  # ()→(N,N) or (nE,N,N)
         return H
 

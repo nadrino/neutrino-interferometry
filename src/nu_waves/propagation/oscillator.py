@@ -67,13 +67,22 @@ class VacuumOscillator:
             E_flat = Ec.reshape(-1)                                   # (B,)
             L_flat = Lc.reshape(-1)                                   # (B,)
             H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (B,N,N)
-            eigvals, eigvecs = linalg.eigh(H)                            # (B,N),(B,N,N)
-            KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
+            eigvals, eigvecs = linalg.eigh(H)
+
             # phase = xp.exp(-1j * eigvals * (L_flat * KM)[:, None]) # (B,N)
+            # S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj()) # (B,N,N)
+
+            # (B,N),(B,N,N)
+            KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
             j = xp.asarray(1j, dtype=self.backend.dtype_complex)  # backend-typed i
             phase = xp.exp((-j) * eigvals * (L_flat * KM)[:, xp.newaxis])
+            # Immediately after computing `phase`:
+            arg = eigvals * (L_flat * KM)[:, xp.newaxis]  # real argument before multiplying by -i
+            # On NumPy:
+            print("max |arg| (NumPy):", np.max(np.abs(self.backend.from_device(arg))))
+            # On Torch:
+            print("max |arg| (Torch):", np.max(np.abs(self.backend.from_device(arg))))
             print("eigvals:", eigvals.dtype, "phase:", phase.dtype)
-            # S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj()) # (B,N,N)
             S = xp.einsum("bik,bk,bjk->bij", eigvecs, phase, xp.conj(eigvecs))
             P = (xp.abs(S) ** 2).reshape(*center_shape, S.shape[-2], S.shape[-1]) # S+(N,N)
         else:
