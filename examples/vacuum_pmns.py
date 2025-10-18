@@ -27,7 +27,7 @@ P = osc.probability(
     L_km=295, E_GeV=Enu_list,
     alpha=flavors.muon,
     beta=[flavors.electron, flavors.muon, flavors.tau],
-    antineutrino=True
+    antineutrino=False
 )
 
 # ----------------------------------------------------------------------

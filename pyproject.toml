@@ -17,6 +17,7 @@ dependencies = [
   "tensorflow-macos; platform_system=='Darwin'",
   "tensorflow-metal; platform_system=='Darwin'",
   "matplotlib",
+#  "torch; version>=2.2"
 ]
 
 [project.urls]
