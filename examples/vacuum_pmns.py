@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.hamiltonian.base import Hamiltonian
+from nu_waves.propagation.oscillator import VacuumOscillator
 import nu_waves.propagation.solvers as solvers
 
 
@@ -34,7 +35,8 @@ P_dis_test = solvers.probability_alpha_to_beta(
 )
 print("P(survival nu_mu, 0.6 GeV, 295 km)", P_dis_test)
 
-Enu_list = np.linspace(0.2, 3.0, 200)
+E_min, E_max = 0.2, 3.0
+Enu_list = np.linspace(E_min, E_max, 200)
 P_dis = solvers.probability_alpha_to_beta(
     solvers.propagator_vacuum(
         hamiltonian.vacuum(Enu_list),
@@ -48,5 +50,31 @@ plt.xlabel(r"$E_\nu$ [GeV]")
 plt.ylabel(r"$P(\nu_\mu \to \nu_\mu)$")
 plt.title("Vacuum oscillation probability")
 plt.grid(True, ls="--", alpha=0.5)
+plt.tight_layout()
+plt.show()
+
+# Compute probabilities:
+# α = 1 (νμ source), β = [1,2,3] → (νμ, νe, ντ)
+osc = VacuumOscillator(mixing_matrix=U_pmns, m2_diag=m2_diag)
+P = osc.probability(L_km=295, E_GeV=Enu_list, alpha=0, beta=np.array([0, 1, 2]))
+# shape (nL, nE, 3) → squeeze L
+# P = P.squeeze(0)
+print("P=", P)
+
+# ----------------------------------------------------------------------
+# Plotting
+# ----------------------------------------------------------------------
+plt.figure(figsize=(6.5, 4.0))
+
+plt.plot(Enu_list, P[:, 2], label=r"$P_{\mu\mu}$ disappearance", lw=2)
+plt.plot(Enu_list, P[:, 3], label=r"$P_{\mu e}$ appearance", lw=2)
+plt.plot(Enu_list, P.sum(axis=1), "--", label="Total probability", lw=1.5)
+
+plt.xlabel(r"$E_\nu$ [GeV]")
+plt.ylabel(r"Probability")
+plt.title(r"T2K-like vacuum oscillation ($L=295\,\mathrm{km}$)")
+plt.xlim(E_min, E_max)
+plt.ylim(0, 1.05)
+plt.legend()
 plt.tight_layout()
 plt.show()
