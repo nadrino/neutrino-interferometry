@@ -32,4 +32,15 @@ S_E = solvers.propagator_vacuum(H_E, L)  # (nE,N,N)
 
 # Probabilité ν_μ → ν_e
 P_mue = solvers.probability_alpha_to_beta(S_E, alpha=2, beta=1)
-print("P(νμ→νe) shape:", P_mue.shape)
+print("P(νμ→νe) size:", P_mue.shape)
+
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(6,4))
+plt.plot(E, P_mue, lw=2)
+plt.xlabel("Neutrino energy $E$ [GeV]")
+plt.ylabel(r"$P(\nu_\mu \to \nu_e)$")
+plt.title("Vacuum oscillation probability")
+plt.grid(True, ls="--", alpha=0.5)
+plt.tight_layout()
+plt.show()
