@@ -15,102 +15,101 @@ class VacuumOscillator:
         Mass-squared values [eV^2].
     """
 
-    def __init__(self, mixing_matrix: np.ndarray, m2_list: np.ndarray):
+    def __init__(self,
+                 mixing_matrix: np.ndarray,
+                 m2_list: np.ndarray,
+                 energy_sampler=None,
+                 baseline_sampler=None,
+                 n_samples=100
+                 ):
         self.hamiltonian = Hamiltonian(mixing_matrix, m2_list)
 
-    # ----------------------------------------------------------------------
+        # samplers: callable(center_array, n_samples)
+        self.energy_sampler = energy_sampler
+        self.baseline_sampler = baseline_sampler
+        self.n_samples = n_samples
 
+    # ----------------------------------------------------------------------
     def probability(self,
-                    L_km: float | np.ndarray,
-                    E_GeV: float | np.ndarray,
                     alpha: int | np.ndarray | None = None,
-                    beta: int | np.ndarray | None = None,
+                    beta:  int | np.ndarray | None = None,
+                    L_km:  np.ndarray | float = 0.0,
+                    E_GeV: np.ndarray | float = 1.0,
                     antineutrino: bool = False
                     ) -> np.ndarray:
-        """
-        Compute P_{alpha -> beta}(L, E).
+        # ---------- normalize inputs & detect grid/pairs ----------
+        L_in = np.asarray(L_km, float)
+        E_in = np.asarray(E_GeV, float)
 
-        Parameters
-        ----------
-        L_km : array or float
-            Baseline(s) in km
-        E_GeV: array or float
-            Neutrino energy(ies) in GeV
-        alpha, beta : int or array or None
-            Flavor indices (0=e, 1=mu, 2=tau).
-            - If both None: returns full (N,N) matrix for each (L,E)
-            - If arrays: broadcasted selection of indices
-        antineutrino :
-            Use the hamiltonian conjugate
+        grid_mode = (L_in.ndim == 1 and E_in.ndim == 1 and L_in.size > 1 and E_in.size > 1)
+        if grid_mode:
+            Lc, Ec = np.meshgrid(L_in, E_in, indexing="ij")          # (nL,nE)
+        else:
+            Lc, Ec = np.broadcast_arrays(L_in, E_in)                  # same-shape S
+            if Lc.ndim == 0:  # both scalars
+                Lc = Lc.reshape(1); Ec = Ec.reshape(1)
 
-        Returns
-        -------
-        P : ndarray
-            If alpha,beta are None: shape (max(nE,nL), N, N)
-            :param antineutrino:
-        """
-        L_km = np.atleast_1d(L_km).astype(float)
-        E_GeV = np.atleast_1d(E_GeV).astype(float)
-        nL, nE = L_km.size, E_GeV.size
+        center_shape = Lc.shape                                       # S
 
-        # Hamiltonian and diagonalization
-        H = self.hamiltonian.vacuum(E_GeV=E_GeV, antineutrino=antineutrino)     # (nE, N, N)
-        eigvals, eigvecs = np.linalg.eigh(H)   # (nE, N), (nE, N, N)
-        N = eigvals.shape[1]
+        # ---------- sampling or no-sampling paths ----------
+        use_sampling = (self.energy_sampler is not None) or (self.baseline_sampler is not None)
+        if not use_sampling:
+            # --- original path (no overhead) ---
+            E_flat = Ec.reshape(-1)                                   # (B,)
+            L_flat = Lc.reshape(-1)                                   # (B,)
+            H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (B,N,N)
+            eigvals, eigvecs = np.linalg.eigh(H)                            # (B,N),(B,N,N)
+            phase = np.exp(-1j * eigvals * (L_flat * KM_TO_EVINV)[:, None]) # (B,N)
+            S = np.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj()) # (B,N,N)
+            P = (np.abs(S) ** 2).reshape(*center_shape, S.shape[-2], S.shape[-1]) # S+(N,N)
+        else:
+            # --- smeared path ---
+            ns = int(max(1, self.n_samples))
 
-        # Build propagators for all (L,E)
-        L = np.atleast_1d(L_km).astype(float) * KM_TO_EVINV      # (nL,)
-        phase = np.exp(-1j * eigvals[None, :, :] * L[:, None, None])  # (nL, nE, N)
+            def _tile(x):
+                return np.repeat(x[..., None], ns, axis=-1)
 
-        # S[l, e, i, j] = sum_k V[e,i,k] * phase[l,e,k] * V[e,j,k]^*
-        S = np.einsum('eik,lek,ejk->leij', eigvecs, phase, eigvecs.conj())
-        P = np.abs(S) ** 2  # trailing axes are (..., beta=i, alpha=j)
+            Es = self.energy_sampler(Ec, ns) if self.energy_sampler else _tile(Ec)  # S+(ns,)
+            Ls = self.baseline_sampler(Lc, ns) if self.baseline_sampler else _tile(Lc)
 
-        # Remember whether inputs were scalars
-        L_is_scalar = np.ndim(L_km) == 0 or (np.ndim(L_km) == 1 and np.size(L_km) == 1)
-        E_is_scalar = np.ndim(E_GeV) == 0 or (np.ndim(E_GeV) == 1 and np.size(E_GeV) == 1)
+            E_flat = Es.reshape(-1)
+            L_flat = Ls.reshape(-1)
 
-        # Squeeze the axes that were scalar in the inputs
-        if L_is_scalar and E_is_scalar:
-            P = P[0, 0]  # -> (N, N)
-        elif L_is_scalar:
-            P = P[0]  # -> (nE, N, N)
-        elif E_is_scalar:
-            P = P[:, 0]  # -> (nL, N, N)
+            H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (S*ns,N,N)
+            eigvals, eigvecs = np.linalg.eigh(H)
+            phase = np.exp(-1j * eigvals * (L_flat * KM_TO_EVINV)[:, None])
+            S = np.einsum("bik,bk,bjk->bij", eigvecs, phase, eigvecs.conj())       # (S*ns,N,N)
+            P = (np.abs(S) ** 2).reshape(*center_shape, ns, S.shape[-2], S.shape[-1]).mean(axis=-3)  # S+(N,N)
 
-        # else keep (nL, nE, N, N)
+        # ---------- squeeze scalar axes like before ----------
+        if not grid_mode:
+            if L_in.ndim == 0 and E_in.ndim == 0:     # both scalars
+                P = P[0]
+            elif P.shape[0] == 1:
+                P = P[0]
 
-        # ---- Robust flavor selection (keeps expected shapes) ----
+        # ---------- flavor selection (same rules as before) ----------
         def _as_idx(x, N):
             if x is None:
                 return np.arange(N)
             x = np.asarray(x)
             return int(x) if x.ndim == 0 else x
 
-        N = P.shape[-1]  # trailing axes are (beta, alpha)
+        N = P.shape[-1]
         a = _as_idx(alpha, N)
-        b = _as_idx(beta, N)
+        b = _as_idx(beta,  N)
 
         if alpha is None and beta is None:
-            return P  # (nE,N,N), (nL,N,N), (N,N), or (nL,nE,N,N)
+            return P
 
         a_scalar = np.isscalar(a)
         b_scalar = np.isscalar(b)
 
         if a_scalar and b_scalar:
-            return P[..., b, a]  # -> (nE), (nL), or scalar
+            return P[..., b, a]
         if a_scalar and not b_scalar:
-            return P[..., b, a]  # -> (nE, len(beta)) or (nL, len(beta))
+            return P[..., b, a]
         if not a_scalar and b_scalar:
-            return P[..., b, a]  # -> (nE, len(alpha)) or (nL, len(alpha))
-
-        # # E -> infinity limit: should go to identity
-        # P_hiE = self.probability(L_km=L_km, E_GeV=1e6, alpha=None, beta=None)
-        # assert np.allclose(P_hiE, np.eye(P_hiE.shape[-1])[None, None, ...], atol=1e-12)
-        #
-        # # Unitarity: sum over beta must be 1
-        # assert np.allclose(P.sum(axis=-2), 1.0, atol=1e-12)
-
-        # both arrays → Cartesian selection
-        return P[..., np.ix_(b, a)]  # -> (..., len(beta), len(alpha))
+            return P[..., b, a]
+        return P[..., np.ix_(b, a)]
 
