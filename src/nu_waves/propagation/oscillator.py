@@ -35,6 +35,14 @@ class VacuumOscillator:
         self.baseline_sampler = baseline_sampler
         self.n_samples = n_samples
 
+    def set_constant_density(self, rho_gcm3: float, Ye: float = 0.5):
+        self._use_matter_constant = True
+        self._matter_args = (float(rho_gcm3), float(Ye))
+
+    def use_vacuum(self):
+        self._use_matter_constant = False
+        self._matter_args = None
+
     # ----------------------------------------------------------------------
     def probability(self,
                     alpha = None,
@@ -75,7 +83,13 @@ class VacuumOscillator:
             E_flat = Es.reshape(-1)
             L_flat = Ls.reshape(-1)
 
-        H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (S*ns,N,N)
+        if getattr(self, "_use_matter_constant", False):
+            rho, Ye = self._matter_args  # set via helper
+            H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
+        else:
+            H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino) # (S*ns,N,N)
+
+        # H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)  # (S*ns,N,N)
         # extra safe
         KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
         HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
