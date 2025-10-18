@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import VacuumOscillator
@@ -47,10 +48,12 @@ torch_backend = make_torch_mps_backend(seed=123, use_complex64=True)  # MPS if a
 # P_np = torch_backend.from_device(P_mps)
 
 # CPU/NumPy
+print("Computing with NumPy")
 osc_np = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 P_np = osc_np.probability(L_km=295, E_GeV=np.linspace(0.2,2.0,200), alpha=1, beta=1)
 
 # MPS
+print("Computing with MPS")
 osc_mps = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=make_torch_mps_backend(seed=0))
 P_mps = osc_mps.probability(L_km=295, E_GeV=np.linspace(0.2,2.0,200), alpha=1, beta=1)
 
@@ -69,8 +72,46 @@ P_mps_full = osc_mps.probability(L_km=295, E_GeV=E, alpha=None, beta=None)
 np.testing.assert_allclose(torch_backend.from_device(P_mps_full).sum(axis=-2), 1.0, atol=2e-6)
 
 
-# compare (looser tolerances for complex64)
-# np.testing.assert_allclose(P_np, torch_backend.from_device(P_mps), rtol=5e-4, atol=5e-5)
+# Compute probabilities:
+# α = 1 (νμ source), β = [1,2,3] → (νμ, νe, ντ)
+E_min, E_max = 0.2, 3.0
+# n_points = 20000000 # GPU is much faster
+n_points = 200000
+Enu_list = np.linspace(E_min, E_max, n_points)
+P_mps = osc_mps.probability(
+    L_km=295, E_GeV=Enu_list,
+    alpha=flavors.muon,
+    beta=[flavors.electron, flavors.muon, flavors.tau],
+    antineutrino=False
+)
+P = torch_backend.from_device(P_mps)
+# P = osc_np.probability(
+#     L_km=295, E_GeV=Enu_list,
+#     alpha=flavors.muon,
+#     beta=[flavors.electron, flavors.muon, flavors.tau],
+#     antineutrino=False
+# )
+
+# ----------------------------------------------------------------------
+# Plotting
+# ----------------------------------------------------------------------
+disable_draw = False
+if not disable_draw:
+    plt.figure(figsize=(6.5, 4.0))
+
+    plt.plot(Enu_list, P[:, flavors.electron], label=r"$P_{\mu e}$ appearance", lw=2)
+    plt.plot(Enu_list, P[:, flavors.muon], label=r"$P_{\mu\mu}$ disappearance", lw=2)
+    plt.plot(Enu_list, P[:, flavors.tau], label=r"$P_{\mu\tau}$ appearance", lw=2)
+    plt.plot(Enu_list, P.sum(axis=1), "--", label="Total probability", lw=1.5)
+
+    plt.xlabel(r"$E_\nu$ [GeV]")
+    plt.ylabel(r"Probability")
+    plt.title(r"T2K-like vacuum oscillation ($L=295\,\mathrm{km}$)")
+    plt.xlim(E_min, E_max)
+    plt.ylim(0, 1.05)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
 
 
