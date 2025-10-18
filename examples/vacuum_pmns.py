@@ -6,7 +6,7 @@ from nu_waves.propagation.oscillator import VacuumOscillator
 import nu_waves.utils.flavors as flavors
 
 # 3 flavors PMNS, PDG values (2025)
-angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49.0)}
+angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(45)}
 phases = {(1, 3): np.deg2rad(195)}
 pmns = Mixing(dim=3, mixing_angles=angles, dirac_phases=phases)
 U_pmns = pmns.get_mixing_matrix()

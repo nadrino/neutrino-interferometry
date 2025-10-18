@@ -12,19 +12,52 @@ class Mixing:
     dirac_phases: dict = field(default_factory=dict)
     majorana_phases: list = field(default_factory=list)
 
-    def get_mixing_matrix(self, include_majorana=False):
-        """Return the full complex mixing matrix U (n×n)."""
+    def get_mixing_matrix(self, include_majorana: bool = False):
+        """
+        Return the full complex mixing matrix U (dim x dim).
+
+        PDG convention is enforced on the active 3x3 sub-block:
+            U_active = R23 * U13(delta) * R12
+        for any dim >= 3. All remaining rotations (e.g. with sterile states)
+        are then applied in the user-provided insertion order.
+        """
         U = np.eye(self.dim, dtype=np.complex128)
-        for (i,j) in sorted(self.mixing_angles.keys()):
-            mixing_angle, dirac_phase = self.mixing_angles[(i, j)], self.dirac_phases.get((i, j), 0.0)
-            s, c = np.sin(mixing_angle), np.cos(mixing_angle)
+
+        # Build the ordered list of rotation pairs to apply (right-multiplication)
+        provided = list(self.mixing_angles.keys())  # preserves insertion order (Py3.7+)
+        order: list[tuple[int, int]] = []
+
+        if self.dim >= 3:
+            pdg_triple = [(2, 3), (1, 3), (1, 2)]
+            # First, apply PDG order for those pairs that are actually provided
+            order.extend([p for p in pdg_triple if p in self.mixing_angles])
+
+        # Then append all the remaining pairs as provided (without sorting)
+        order.extend([p for p in provided if p not in order])
+
+        # Apply rotations in that order (right-multiply: rotations act on mass columns)
+        for (i, j) in order:
+            theta = self.mixing_angles[(i, j)]
+            delta = self.dirac_phases.get((i, j), 0.0)
+            s, c = np.sin(theta), np.cos(theta)
+
             R = np.eye(self.dim, dtype=np.complex128)
-            R[i-1,i-1] = c; R[j-1,j-1] = c
-            R[i-1,j-1] = s*np.exp(-1j*dirac_phase); R[j-1,i-1] = -s*np.exp(1j*dirac_phase)
+            ii, jj = i - 1, j - 1
+            R[ii, ii] = c
+            R[jj, jj] = c
+            # PDG sign convention (R23 has -s in (3,2); implemented generically here)
+            R[ii, jj] = s * np.exp(-1j * delta)
+            R[jj, ii] = -s * np.exp(+1j * delta)
+
             U = U @ R
+
         if include_majorana and any(self.majorana_phases):
-            M = np.diag([np.exp(1j*a/2) for a in [0] + self.majorana_phases])
+            # Majorana phases: dim-1 physical phases (first one conventionally 0)
+            phases = [0.0] + list(self.majorana_phases)
+            phases = np.array(phases[:self.dim], dtype=float)  # trim/pad
+            M = np.diag(np.exp(0.5j * phases))
             U = U @ M
+
         return U
 
 
