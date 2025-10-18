@@ -20,16 +20,68 @@ osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 
 # calculate without matter effects
 osc.use_vacuum()
-P_vac = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,50), alpha=1, beta=0)
+P_vac = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,50), alpha=flavors.muon, beta=flavors.electron)
 
 # compare with density = 0
 osc.set_constant_density(rho_gcm3=0.0, Ye=0.5)
-P_zero = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,50), alpha=1, beta=0)
+P_zero = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,50), alpha=flavors.muon, beta=flavors.electron)
 
 # should be equal
 np.testing.assert_allclose(P_vac, P_zero, atol=1e-12)
 
 
+# --- DUNE-like configuration ---
+L_km = 1300.0                  # Fermilab → SURF
+rho_gcm3, Ye = 2.8, 0.5        # average crust density and electron fraction
+E = np.linspace(0.2, 5.0, 600) # GeV
 
+# --- Vacuum probabilities ---
+osc.use_vacuum()
+P_mue_vac = osc.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0)   # νμ→νe
 
+# --- Constant-density matter probabilities ---
+osc.set_constant_density(rho_gcm3=rho_gcm3, Ye=Ye)
+P_mue_matt = osc.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0)
+
+# --- (optional) antineutrinos for comparison ---
+P_muebar_matt = osc.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0, antineutrino=True)
+
+# --- Plot ---
+plt.figure(figsize=(7,4.2))
+plt.plot(E, P_mue_vac,  label=r"$\nu_\mu\!\to\!\nu_e$ (vac)", lw=2)
+plt.plot(E, P_mue_matt, label=r"$\nu_\mu\!\to\!\nu_e$ (matter)", lw=2)
+plt.plot(E, P_muebar_matt, ":", label=r"$\bar\nu_\mu\!\to\!\bar\nu_e$ (matter)", lw=2)
+
+plt.xlabel(r"$E_\nu$ [GeV]")
+plt.ylabel("Probability")
+plt.title("DUNE-like oscillation, L=1300 km (vacuum vs matter)")
+plt.xlim(E.min(), E.max())
+plt.ylim(0, 0.3)
+plt.legend(ncol=2, frameon=False)
+plt.tight_layout()
+plt.show()
+
+# inverted ordering?
+spec = Spectrum(n=3, m_lightest=0.)
+spec.set_dm2({(2, 1): 7.42e-5, (3, 2): -0.0024428})
+
+# oscillator
+osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+
+# calculate without matter effects
+osc.set_constant_density(rho_gcm3=rho_gcm3, Ye=Ye)
+P_mue_matt_inv = osc.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0)
+
+plt.figure(figsize=(7,4.2))
+plt.plot(E, P_mue_matt, label=r"$\nu_\mu\!\to\!\nu_e$ (matter) NO", lw=2)
+plt.plot(E, P_mue_matt_inv, label=r"$\nu_\mu\!\to\!\nu_e$ (matter) IO", lw=2)
+
+plt.xlabel(r"$E_\nu$ [GeV]")
+plt.ylabel("Probability")
+plt.title("DUNE-like oscillation, L=1300 km (vacuum vs matter)")
+plt.xlim(E.min(), E.max())
+plt.ylim(0, 0.3)
+plt.legend(ncol=2, frameon=False)
+plt.tight_layout()
+plt.show()
 
