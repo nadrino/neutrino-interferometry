@@ -13,6 +13,10 @@ class _TorchXP:
         self.dtype_real = dtype_real
         self.dtype_complex = dtype_complex
 
+    def eye(self, N, dtype=None):
+        dt = dtype if dtype is not None else self.dtype_complex
+        return torch.eye(N, dtype=dt, device=self.device)
+
     # array-like
     def asarray(self, x, dtype=None):
         if isinstance(x, torch.Tensor):
@@ -92,6 +96,17 @@ def make_torch_mps_backend(seed: int | None = None, use_complex64: bool = True) 
                 A_cpu = A.detach().to("cpu")
                 w_cpu, V_cpu = torch.linalg.eigh(A_cpu)
                 return w_cpu.to(dev), V_cpu.to(dev)
+
+        @staticmethod
+        def matrix_exp(A):
+            import torch
+            try:
+                return torch.linalg.matrix_exp(A)  # native if available
+            except NotImplementedError:
+                dev = A.device
+                A_cpu = A.detach().to("cpu")
+                S_cpu = torch.linalg.matrix_exp(A_cpu)
+                return S_cpu.to(dev)
 
     class _TorchRNG:
         def __init__(self, generator): self.g = generator
