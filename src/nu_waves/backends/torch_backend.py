@@ -27,6 +27,11 @@ class _TorchXP:
         # numpy / python
         return torch.as_tensor(x, dtype=dtype, device=self.device)
 
+    def zeros(self, shape, dtype=None):
+        import torch
+        dt = dtype if dtype is not None else self.dtype_real
+        return torch.zeros(shape, dtype=dt, device=self.device)
+
     def abs(self, x):         return torch.abs(x)
     def exp(self, x):         return torch.exp(x)
     def conj(self, x):        return torch.conj(x)

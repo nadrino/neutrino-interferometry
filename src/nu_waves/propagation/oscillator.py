@@ -110,7 +110,13 @@ class VacuumOscillator:
                 # accumulate S_tot = S_K @ ... @ S_1 (source→detector order = list order)
                 N = self.hamiltonian.U.shape[0]
                 S = xp.eye(N, dtype=self.backend.dtype_complex)[xp.newaxis, ...]  # (1,N,N) seed
-                S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()  # (B,N,N) identities
+
+                if hasattr(S, "clone"):  # Torch tensors
+                    S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).clone()
+                else:  # NumPy arrays
+                    S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()
+
+                # S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()  # (B,N,N) identities
 
                 for k, layer in enumerate(prof.layers):
                     Hk = self.hamiltonian.matter_constant(E_flat,
