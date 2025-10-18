@@ -40,6 +40,17 @@ class _TorchXP:
 
     def arange(self, N): return torch.arange(N, device=self.device)
 
+    def einsum(self, subscripts, *operands): return torch.einsum(subscripts, *operands)
+    def broadcast_to(self, x, shape): return torch.broadcast_to(x, shape)
+
+    def isscalar(self, x):
+        # Behave like numpy.isscalar: True for Python numbers or 0-D tensors
+        if isinstance(x, (int, float, complex, bool)):
+            return True
+        if isinstance(x, torch.Tensor) and x.ndim == 0:
+            return True
+        return False
+
     def conjugate(self, x):  # alias for NumPy-compat
         return torch.conj(x)
 
