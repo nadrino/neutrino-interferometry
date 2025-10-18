@@ -1,0 +1,3 @@
+
+KM_TO_EVINV = 5.067730716e9
+GEV_TO_EV = 1.0e9  # eV / GeV

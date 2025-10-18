@@ -1,6 +1,6 @@
 import numpy as np
 from nu_waves.hamiltonian.base import Hamiltonian
-from nu_waves.propagation.solvers import KM_TO_EVINV
+from nu_waves.utils.units import KM_TO_EVINV
 
 
 class VacuumOscillator:
@@ -24,33 +24,37 @@ class VacuumOscillator:
                     L_km: float | np.ndarray,
                     E_GeV: float | np.ndarray,
                     alpha: int | np.ndarray | None = None,
-                    beta: int | np.ndarray | None = None) -> np.ndarray:
+                    beta: int | np.ndarray | None = None,
+                    antineutrino: bool = False
+                    ) -> np.ndarray:
         """
         Compute P_{alpha -> beta}(L, E).
 
         Parameters
         ----------
+        L_km : array or float
+            Baseline(s) in km
+        E_GeV: array or float
+            Neutrino energy(ies) in GeV
         alpha, beta : int or array or None
             Flavor indices (0=e, 1=mu, 2=tau).
             - If both None: returns full (N,N) matrix for each (L,E)
             - If arrays: broadcasted selection of indices
-        L_km : array or float
-            Baseline(s) in km
-        E_GeV : array or float
-            Neutrino energy(ies) in GeV
+        antineutrino :
+            Use the hamiltonian conjugate
 
         Returns
         -------
         P : ndarray
-            If alpha,beta are None: shape (nL, nE, N, N)
-            Else: shape broadcasted over L,E plus flavor indices.
+            If alpha,beta are None: shape (max(nE,nL), N, N)
+            :param antineutrino:
         """
         L_km = np.atleast_1d(L_km).astype(float)
         E_GeV = np.atleast_1d(E_GeV).astype(float)
         nL, nE = L_km.size, E_GeV.size
 
         # Hamiltonian and diagonalization
-        H = self.hamiltonian.vacuum(E_GeV)     # (nE, N, N)
+        H = self.hamiltonian.vacuum(E_GeV=E_GeV, antineutrino=antineutrino)     # (nE, N, N)
         eigvals, eigvecs = np.linalg.eigh(H)   # (nE, N), (nE, N, N)
         N = eigvals.shape[1]
 
