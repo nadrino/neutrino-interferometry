@@ -1,5 +1,6 @@
 import numpy as np
 
+GEV_TO_EV = 1.0e9  # eV / GeV
 
 class Hamiltonian:
     def __init__(self, mixing_matrix: np.ndarray, m2_diag: np.ndarray):
@@ -16,6 +17,6 @@ class Hamiltonian:
         E: scalar or array (GeV); returns (N,N) if scalar, (nE,N,N) otherwise.
         """
         E = np.asarray(E, dtype=float)
-        D = self.m2_diag / (2.0 * E[..., None, None])  # broadcast sur E
+        D = self.m2_diag / (2.0 * E[..., None, None] * GEV_TO_EV)  # broadcast sur E
         return self.U @ D @ self.U.conj().T
 
