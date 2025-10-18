@@ -66,7 +66,12 @@ class VacuumOscillator:
         L_in = xp.asarray(L_km, dtype=self.backend.dtype_real)
         E_in = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
 
-        grid_mode = (L_in.ndim == 1 and E_in.ndim == 1 and L_in.size > 1 and E_in.size > 1)
+        # grid_mode = (L_in.ndim == 1 and E_in.ndim == 1 and L_in.size > 1 and E_in.size > 1)
+        grid_mode = (
+              L_in.ndim == 1 and E_in.ndim == 1
+              and int(L_in.shape[0]) > 1 and int(E_in.shape[0]) > 1
+        )
+
         if grid_mode:
             Lc, Ec = xp.meshgrid(L_in, E_in, indexing="ij")          # (nL,nE)
         else:

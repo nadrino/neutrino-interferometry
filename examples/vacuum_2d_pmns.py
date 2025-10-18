@@ -1,9 +1,11 @@
 import numpy as np
+import time
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.backends import make_torch_mps_backend
 import nu_waves.utils.flavors as flavors
 
 # 3 flavors PMNS, PDG values (2025)
@@ -16,23 +18,36 @@ U_pmns = pmns.get_mixing_matrix()
 spec = Spectrum(n=3)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
+# toggle for CPU/GPU
+# torch_backend = None
+torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+
 # oscillator
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
 
 # --- Grid definition (x: energy, y: baseline) ---
-E_vals = np.linspace(0.2, 5.0, 400)     # GeV  (x-axis)
-L_vals = np.linspace(1000, 2000.0, 300) # km   (y-axis)
+E_vals = np.linspace(0.2, 5.0, 1000)     # GeV  (x-axis)
+L_vals = np.linspace(1000, 2000.0, 1000) # km   (y-axis)
 
 # --- Choose vacuum or matter ---
 # osc.use_vacuum()  # vacuum
 # For constant density (crust-like), uncomment:
 osc.set_constant_density(rho_gcm3=2.8, Ye=0.5)
 
+t0 = time.perf_counter()
+
 # --- Compute probabilities in grid mode (shape -> (nL, nE) after selection) ---
 # alpha=1 (muon), beta=0 (electron) → appearance
 P_mue = osc.probability(L_km=L_vals, E_GeV=E_vals, alpha=1, beta=0)   # (nL, nE)
 # alpha=1 (muon), beta=1 (muon) → disappearance
 P_mumu = osc.probability(L_km=L_vals, E_GeV=E_vals, alpha=1, beta=1)  # (nL, nE)
+
+if torch_backend is not None:
+    P_mue = torch_backend.from_device(P_mue)
+    P_mumu = torch_backend.from_device(P_mumu)
+
+t1 = time.perf_counter()
+print(f"Computation time: {t1 - t0:.3f} s")
 
 # --- Plot helper ---
 def plot_oscillogram(ax, E, L, P, title):
