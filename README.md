@@ -1,10 +1,14 @@
-# Neutrino Interferometry
+# Neutrino Interferometry - `nu_waves` Python library
 
 ## What is it?
 
 **Neutrino Interferometry**, or `nu_waves`, is a simple Python library
 that calculate flavor oscillation of neutrinos.
 You can input your own parameters and get the oscillation probabilities.
+
+
+## How to install?
+
 
 
 ## Features

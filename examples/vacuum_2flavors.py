@@ -8,8 +8,12 @@ import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
 # toggle GPU
-torch_backend = None
-# torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+# torch_backend = None
+torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+
+nBins_L = 200
+nSamples_E = 10000
+
 
 # sterile test
 osc_amplitude = 0.2 # sin^2(2\theta)
@@ -30,7 +34,7 @@ osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torc
 
 E_fixed = 3E-3
 L_min, L_max = 1e-3, 20e-3
-L_list = np.linspace(L_min, L_max, 200)
+L_list = np.linspace(L_min, L_max, nBins_L)
 print(L_list)
 P = osc.probability(
     L_km=L_list, E_GeV=E_fixed,
@@ -79,7 +83,7 @@ def energy_sampler_sqrt(E_center, n, a=0.008):
 
 # osc.baseline_sampler = baseline_sampler_gauss
 osc.energy_sampler = energy_sampler_sqrt
-osc.n_samples = 1000
+osc.n_samples = nSamples_E
 P_damp = osc.probability(
     L_km=L_list, E_GeV=E_fixed,
     alpha=flavors.electron,

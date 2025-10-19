@@ -51,24 +51,30 @@ class _TorchXP:
 
     def normal(self, loc=0.0, scale=1.0, size=None):
         """
-        Torch equivalent of np.random.normal, supporting tensor broadcasting.
-        Works with scalar or tensor mean/std, and optional size argument.
+        Torch equivalent of np.random.normal, supporting tensor broadcasting
+        and explicit size expansion (unlike torch.normal).
         """
+        # Convert numpy arrays to tensors if needed
+        if not isinstance(loc, torch.Tensor):
+            loc = torch.as_tensor(loc, device=self.device)
+        if not isinstance(scale, torch.Tensor):
+            scale = torch.as_tensor(scale, device=self.device)
 
-        # Case 1: loc and scale are tensors (same shape)
+        # Case 1: both tensors
         if isinstance(loc, torch.Tensor) and isinstance(scale, torch.Tensor):
-            return torch.normal(mean=loc, std=scale)
+            if size is None or tuple(size) == tuple(loc.shape):
+                # Default: same shape as loc
+                return torch.normal(mean=loc, std=scale)
+            else:
+                # Manually expand via broadcasting to requested size
+                loc_b = loc.expand(size)
+                scale_b = scale.expand(size)
+                return torch.normal(mean=loc_b, std=scale_b)
 
-        # Case 2: loc and/or scale are scalars + size provided
-        if size is not None:
-            loc_t = float(loc) if not isinstance(loc, torch.Tensor) else float(loc)
-            scale_t = float(scale) if not isinstance(scale, torch.Tensor) else float(scale)
-            return torch.normal(mean=loc_t, std=scale_t, size=size, device=self.device)
-
-        # Case 3: fallback — both scalar, no explicit size
-        loc_t = float(loc) if not isinstance(loc, torch.Tensor) else float(loc)
-        scale_t = float(scale) if not isinstance(scale, torch.Tensor) else float(scale)
-        return torch.normal(mean=loc_t, std=scale_t, size=(), device=self.device)
+        # Case 2: at least one scalar → use size directly
+        mean_val = float(loc) if not isinstance(loc, torch.Tensor) else float(loc)
+        std_val  = float(scale) if not isinstance(scale, torch.Tensor) else float(scale)
+        return torch.normal(mean=mean_val, std=std_val, size=size, device=self.device)
 
     def uniform(self, low=0.0, high=1.0, size=None):
         if size is None:
