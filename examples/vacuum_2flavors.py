@@ -3,10 +3,15 @@ import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.backends import make_torch_mps_backend
 import nu_waves.utils.flavors as flavors
 
+# toggle GPU
+# torch_backend = None
+torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+
 # sterile test
-osc_amplitude = 0.1 # sin^2(2\theta)
+osc_amplitude = 0.2 # sin^2(2\theta)
 angles = {(1, 2): np.arcsin(np.sqrt(osc_amplitude))/2}
 pmns = Mixing(dim=2, mixing_angles=angles)
 U_pmns = pmns.get_mixing_matrix()
@@ -20,7 +25,7 @@ spec.summary()
 m2_diag = np.diag(spec.get_m2())
 
 
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
 
 E_fixed = 3E-3
 L_min, L_max = 1e-3, 20e-3
@@ -34,10 +39,12 @@ P = osc.probability(
 )
 # print(P)
 
+xp = osc.backend.xp
+
 # Example: fractional Gaussian energy resolution and fixed baseline blur
 rng = np.random.default_rng(123)
 def baseline_sampler(L_center, n):
-    L_center = np.asarray(L_center)
+    L_center = xp.asarray(L_center)
     print("L_center",L_center)
     # broadcast low/high to center's shape, then append sample axis
     low = (L_center - 0.001)[..., None]
@@ -49,7 +56,7 @@ def baseline_sampler_gauss(L_center, n):
     Absolute Gaussian smearing with sigma = 0.001 km.
     Works for scalar, vector, or grid L_center; returns shape L_center.shape + (n,).
     """
-    Lc = np.asarray(L_center, dtype=float)
+    Lc = xp.asarray(L_center, dtype=float)
     return rng.normal(loc=Lc[..., None], scale=0.001, size=Lc.shape + (n,))
 
 def energy_sampler_sqrt(E_center, n, a=0.008):
@@ -61,15 +68,17 @@ def energy_sampler_sqrt(E_center, n, a=0.008):
 
     Returns: samples with shape E_center.shape + (n,)
     """
-    E = np.asarray(E_center, dtype=float)
+    E = xp.asarray(E_center, dtype=float)
     # avoid sqrt of negatives; also avoids zero-variance at E=0
-    E_safe = np.maximum(E, 1e-12)
-    sigma = a * np.sqrt(E_safe)
-    return rng.normal(loc=E[..., None], scale=sigma[..., None], size=E.shape + (n,))
+    E_safe = xp.maximum(E, 1e-12)
+    sigma = a * xp.sqrt(E_safe)
+    out = xp.normal(loc=E[..., None], scale=sigma[..., None], size=E.shape + (n,))
+    print("out.shape",out.shape)
+    return out
 
 # osc.baseline_sampler = baseline_sampler_gauss
 osc.energy_sampler = energy_sampler_sqrt
-osc.n_samples = 1000
+osc.n_samples = 100
 P_damp = osc.probability(
     L_km=L_list, E_GeV=E_fixed,
     alpha=flavors.electron,
@@ -82,7 +91,7 @@ P_damp = osc.probability(
 # ----------------------------------------------------------------------
 # Plotting
 # ----------------------------------------------------------------------
-plt.figure(figsize=(6.5, 4.0))
+plt.figure(figsize=(6.5, 4.0), dpi=150)
 
 plt.plot(L_list*1000, P, label=r"$P_{e e}$ disappearance", lw=2)
 plt.plot(L_list*1000, P_damp, label=r"$P_{e e}$ disappearance (with E smearing)", lw=2)
@@ -96,3 +105,5 @@ plt.ylim(0, 1.05)
 plt.legend()
 plt.tight_layout()
 plt.show()
+
+plt.savefig("../figures/vacuum_2flavors.pdf")
