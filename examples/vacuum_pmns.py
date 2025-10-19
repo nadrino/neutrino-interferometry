@@ -48,3 +48,5 @@ plt.ylim(0, 1.05)
 plt.legend()
 plt.tight_layout()
 plt.show()
+
+plt.savefig("../figures/vacuum_pmns.pdf")
