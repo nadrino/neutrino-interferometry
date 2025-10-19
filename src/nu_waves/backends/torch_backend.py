@@ -32,6 +32,16 @@ class _TorchXP:
         dt = dtype if dtype is not None else self.dtype_real
         return torch.zeros(shape, dtype=dt, device=self.device)
 
+    def stack(self, arrays, axis=0):
+        return torch.stack(arrays, dim=axis)
+
+    def argmax(self, x, axis=None):
+        return torch.argmax(x, dim=axis)
+
+    def angle(self, z):
+        # Equivalent of numpy.angle for complex tensors
+        return torch.atan2(torch.imag(z), torch.real(z))
+
     def abs(self, x):         return torch.abs(x)
     def exp(self, x):         return torch.exp(x)
     def conj(self, x):        return torch.conj(x)
