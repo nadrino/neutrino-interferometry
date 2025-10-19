@@ -265,3 +265,90 @@ class VacuumOscillator:
             F = F[::-1, :]  # restore original r_km ordering
 
         return F
+
+    def initial_mass_composition(
+          self,
+          alpha: int,
+          basis: str = "vacuum",  # "vacuum" (no matter), "matter", or "vacuum_from_matter"
+          E_GeV: float | None = None,
+          profile=None,
+          r_emit_km: float | None = None,
+          antineutrino: bool = False,
+    ):
+        """
+        Returns a length-N vector of fractions.
+
+        basis="vacuum":
+            Return |U_{alpha i}|^2 (no matter input needed).
+        basis="matter":
+            Return w_matter[j] = |<nu_j^m(r_emit)|nu_alpha>|^2, needs E, profile, r_emit_km.
+        basis="vacuum_from_matter":
+            Adiabatic-consistent 'initial' vacuum-mass fractions at emission:
+            F0[i] = sum_j |<nu_i^vac|nu_j^m(r_emit)>|^2 * w_matter[j].
+        """
+        xp = self.backend.xp
+        U = self.hamiltonian.U  # (N,N)
+        N = U.shape[0]
+
+        if basis == "vacuum":
+            e_alpha = xp.zeros((N,), dtype=self.backend.dtype_complex);
+            e_alpha[alpha] = 1.0
+            F0 = xp.abs(xp.swapaxes(xp.conj(U), -1, -2) @ e_alpha) ** 2  # |U^† e_alpha|^2
+            return self.backend.from_device(F0)
+
+        # the two matter-aware options need E, profile, r_emit_km
+        if E_GeV is None or profile is None or r_emit_km is None:
+            raise ValueError("E_GeV, profile, and r_emit_km are required for matter-aware bases.")
+
+        rho = float(np.asarray(profile.rho_gcm3([r_emit_km]), float)[0])
+        Ye = float(np.asarray(profile.Ye([r_emit_km]), float)[0])
+        H = self.hamiltonian.matter_constant(E_GeV, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
+        if H.ndim == 3: H = H[0]  # (N,N)
+
+        evals, V = self.backend.linalg.eigh(H)  # columns = |nu_j^m>
+        e_alpha = xp.zeros((N,), dtype=self.backend.dtype_complex);
+        e_alpha[alpha] = 1.0
+        c = xp.swapaxes(xp.conj(V), -1, -2) @ e_alpha
+        w_matter = xp.abs(c) ** 2  # (N,)
+
+        if basis == "matter":
+            return self.backend.from_device(w_matter)
+
+        if basis == "vacuum_from_matter":
+            M = xp.abs(xp.swapaxes(xp.conj(U), -1, -2) @ V) ** 2  # (N,N)
+            F0 = M @ w_matter
+            return self.backend.from_device(F0)
+
+        raise ValueError("basis must be 'vacuum', 'matter', or 'vacuum_from_matter'")
+
+    def adiabatic_mass_fractions_from_emission(
+          self,
+          E_GeV: float | np.ndarray,
+          profile,  # SolarProfile-like: rho_gcm3(r), Ye(r), R_sun_km
+          r_emit_km: float,
+          s_km: np.ndarray,  # (n,) propagation lengths from emission, km (>=0), monotonic
+          alpha: int = 0,
+          antineutrino: bool = False,
+    ):
+        """
+        Phase-averaged vacuum mass fractions along a path defined by distances s_km from r_emit_km.
+        Returns F with shape (n, N), aligned with s_km (i.e., with r = r_emit_km + s_km).
+        """
+        s = np.asarray(s_km, float)
+        if s.ndim != 1 or s.size < 2:
+            raise ValueError("s_km must be a 1D array with length ≥ 2.")
+        if np.any(s < 0):
+            raise ValueError("s_km must be non-negative.")
+        # monotonic check (allow equal last samples)
+        if np.any(np.diff(s) < 0):
+            raise ValueError("s_km must be non-decreasing.")
+
+        R_sun = getattr(profile, "R_sun_km", np.inf)
+        r_path = r_emit_km + s
+        # clamp to surface to avoid overshooting
+        r_path = np.clip(r_path, 0.0, R_sun)
+
+        return self.adiabatic_mass_fractions(
+            E_GeV=E_GeV, profile=profile, r_km=r_path,
+            alpha=alpha, antineutrino=antineutrino
+        )
