@@ -38,6 +38,46 @@ class _TorchXP:
             return getattr(torch, name)
         raise AttributeError(f"_TorchXP has no attribute {name}")
 
+    def maximum(self, x, y):
+        # torch.maximum only works on tensors — make sure both are tensors
+        x_t = x if isinstance(x, torch.Tensor) else torch.as_tensor(x, device=self.device)
+        y_t = y if isinstance(y, torch.Tensor) else torch.as_tensor(y, device=self.device)
+        return torch.maximum(x_t, y_t)
+
+    def minimum(self, x, y):
+        x_t = x if isinstance(x, torch.Tensor) else torch.as_tensor(x, device=self.device)
+        y_t = y if isinstance(y, torch.Tensor) else torch.as_tensor(y, device=self.device)
+        return torch.minimum(x_t, y_t)
+
+    def normal(self, loc=0.0, scale=1.0, size=None):
+        """
+        Torch equivalent of np.random.normal, supporting tensor broadcasting.
+        Works with scalar or tensor mean/std, and optional size argument.
+        """
+
+        # Case 1: loc and scale are tensors (same shape)
+        if isinstance(loc, torch.Tensor) and isinstance(scale, torch.Tensor):
+            return torch.normal(mean=loc, std=scale)
+
+        # Case 2: loc and/or scale are scalars + size provided
+        if size is not None:
+            loc_t = float(loc) if not isinstance(loc, torch.Tensor) else float(loc)
+            scale_t = float(scale) if not isinstance(scale, torch.Tensor) else float(scale)
+            return torch.normal(mean=loc_t, std=scale_t, size=size, device=self.device)
+
+        # Case 3: fallback — both scalar, no explicit size
+        loc_t = float(loc) if not isinstance(loc, torch.Tensor) else float(loc)
+        scale_t = float(scale) if not isinstance(scale, torch.Tensor) else float(scale)
+        return torch.normal(mean=loc_t, std=scale_t, size=(), device=self.device)
+
+    def uniform(self, low=0.0, high=1.0, size=None):
+        if size is None:
+            return (high - low) * torch.rand((), device=self.device) + low
+        return (high - low) * torch.rand(size, device=self.device) + low
+
+    def random(self, size=None):
+        return torch.rand(size, device=self.device)
+
     def broadcast_arrays(self, *xs):
         # torch.broadcast_tensors requires tensors, not python scalars
         ts = [x if isinstance(x, torch.Tensor) else torch.as_tensor(x, device=self.device) for x in xs]

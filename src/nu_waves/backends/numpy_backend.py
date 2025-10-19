@@ -12,6 +12,15 @@ class _NumpyXP:
         raise AttributeError(f"_NumpyXP has no attribute {name}")
 
     # common helpers used by the codebase
+    def normal(self, loc=0.0, scale=1.0, size=None):
+        return np.random.normal(loc=loc, scale=scale, size=size)
+
+    def uniform(self, low=0.0, high=1.0, size=None):
+        return np.random.uniform(low=low, high=high, size=size)
+
+    def random(self, size=None):
+        return np.random.random(size=size)
+
     def asarray(self, x, dtype=None):
         return np.asarray(x, dtype=dtype)
 

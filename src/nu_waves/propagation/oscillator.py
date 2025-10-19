@@ -96,7 +96,6 @@ class VacuumOscillator:
             E_flat = Es.reshape(-1)
             L_flat = Ls.reshape(-1)
 
-
         KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
 
         if getattr(self, "_use_matter", False):
