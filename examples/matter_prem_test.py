@@ -1,5 +1,5 @@
-# examples/oscillogram_prem_refined.py
 import numpy as np
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from nu_waves.models.mixing import Mixing
@@ -51,22 +51,37 @@ E = np.linspace(1, 10, 400)
 P_NO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0)              # neutrinos, NO
 P_IO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0, antineutrino=True)  # ν̄ in IO has the resonance
 
-P_NO = torch_backend.from_device(P_NO)
-P_IO = torch_backend.from_device(P_IO)
+if torch_backend:
+    P_NO = torch_backend.from_device(P_NO)
+    P_IO = torch_backend.from_device(P_IO)
 print("P_mu->e max (NO, ν):", P_NO.max(), "  P_mu->e max (IO, ν̄):", P_IO.max())
 
 E_GeV = np.logspace(-1, 2, 400)     # x
 cosz  = np.linspace(-1.0, 1.0, 240)     # y (upgoing)
 prem  = PREMModel()
 
+prof1 = prem.profile_from_coszen(-1, scheme="prem_layers")
+prof2 = prem.profile_from_coszen(-1, scheme="hist_density", n_bins=4000, nbins_density=60)
+osc.set_layered_profile(prof1); P1 = osc.probability(L_km=sum(l.weight for l in prof1.layers), E_GeV=E, alpha=1, beta=0)
+osc.set_layered_profile(prof2); P2 = osc.probability(L_km=sum(l.weight for l in prof2.layers), E_GeV=E, alpha=1, beta=0)
+
+if torch_backend:
+    P2 = torch_backend.from_device(P2)
+    P1 = torch_backend.from_device(P1)
+
+print("max |ΔP| prem vs hist =", np.max(np.abs(P1-P2)))
+
+
+
+
 P_mue  = np.zeros((cosz.size, E_GeV.size))
 P_mumu = np.zeros_like(P_mue)
 
 # choose one:
-SCHEME = "prem_layers"      # exact PREM shells
-# SCHEME = "hist_density"   # fine histogram of density along path
+# SCHEME = "prem_layers"      # exact PREM shells
+SCHEME = "hist_density"   # fine histogram of density along path
 
-for iy, cz in enumerate(cosz):
+for iy, cz in tqdm(enumerate(cosz), total=len(cosz)):
     prof = prem.profile_from_coszen(cz, scheme=SCHEME, n_bins=1200, nbins_density=36, merge_tol=0.0)
     osc.set_layered_profile(prof)
 
@@ -104,7 +119,11 @@ def draw(ax, X, Y, Z, title):
     cbar = plt.colorbar(pc, ax=ax, pad=0.01)
     cbar.set_label("Probability")
 
-fig, axs = plt.subplots(1, 2, figsize=(11, 4.2), constrained_layout=True)
+fig, axs = plt.subplots(
+    1, 2, figsize=(11, 4.2),
+    dpi=150,
+    constrained_layout=True
+)
 draw(axs[0], E_GeV, cosz, P_mue,  r"$P(\nu_\mu\to\nu_e)$ — PREM refined")
 draw(axs[1], E_GeV, cosz, P_mumu, r"$P(\nu_\mu\to\nu_\mu)$ — PREM refined")
 plt.show()

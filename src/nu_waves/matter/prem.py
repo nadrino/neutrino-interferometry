@@ -87,12 +87,32 @@ class PREMModel:
         cz = float(cosz)
         return self.R_earth_km * np.sqrt(max(0.0, 1.0 - cz*cz))
 
+    # atmosphere thickness
+    def _atm_path_km(self, cosz: float, h_km: float) -> float:
+        """Line-of-sight path length through a thin shell from radius R to R+h."""
+        if h_km <= 0: return 0.0
+        R, Rp = self.R_earth_km, self.R_earth_km + h_km
+        b = self._impact_parameter_km(cosz)
+        if b >= Rp:  # grazing above atmosphere
+            return 0.0
+
+        def seg(r):
+            return np.sqrt(max(r * r - b * b, 0.0))
+
+        if cosz >= 0.0:
+            # one segment (production→detector)
+            return seg(Rp) - seg(R)
+        else:
+            # two segments (far + near side)
+            return 2.0 * (seg(Rp) - seg(R))
+
     # --- layer builders ---
     def profile_from_coszen(self, cosz: float,
                             scheme: str = "prem_layers",
                             n_bins: int = 800,
                             nbins_density: int = 24,
-                            merge_tol: float = 0.0) -> MatterProfile:
+                            merge_tol: float = 0.0,
+                            h_atm_km: float = 15.0) -> MatterProfile:
         """
         Build a MatterProfile for a chord at cosine-zenith 'cosz'.
         scheme:
@@ -130,6 +150,16 @@ class PREMModel:
                 rho_mid = float(self.rho(r_mid))
                 Ye_mid  = float(self.Ye(r_mid))
                 layers.append(MatterLayer(rho_mid, Ye_mid, dL, "absolute"))
+
+            L_atm = self._atm_path_km(cosz, h_atm_km)
+            if L_atm > 0.0:
+                if cosz >= 0.0:
+                    layers = [MatterLayer(0.0, self.Ye_mantle, L_atm, "absolute")] + layers
+                else:
+                    half = 0.5 * L_atm
+                    layers = [MatterLayer(0.0, self.Ye_mantle, half, "absolute")] + layers + \
+                             [MatterLayer(0.0, self.Ye_mantle, half, "absolute")]
+
             return MatterProfile(layers)
 
         elif scheme == "hist_density":
@@ -188,6 +218,15 @@ class PREMModel:
                         cur = nxt
                 merged.append(cur)
                 layers = merged
+
+            L_atm = self._atm_path_km(cosz, h_atm_km)
+            if L_atm > 0.0:
+                if cosz >= 0.0:
+                    layers = [MatterLayer(0.0, self.Ye_mantle, L_atm, "absolute")] + layers
+                else:
+                    half = 0.5 * L_atm
+                    layers = [MatterLayer(0.0, self.Ye_mantle, half, "absolute")] + layers + \
+                             [MatterLayer(0.0, self.Ye_mantle, half, "absolute")]
 
             return MatterProfile(layers)
 
