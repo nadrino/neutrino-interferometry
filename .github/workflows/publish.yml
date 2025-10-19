@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   build-publish:
+    environment: "GitHub Actions"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
