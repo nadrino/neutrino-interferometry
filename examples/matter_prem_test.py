@@ -13,6 +13,22 @@ from nu_waves.backends import make_torch_mps_backend
 # torch_backend = None
 torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
 
+# choose one:
+# SCHEME = "prem_layers"      # exact PREM shells
+SCHEME = "hist_density"   # fine histogram of density along path
+
+
+plt.rcParams.update({
+    "font.size": 16,
+    "axes.titlesize": 18,
+    "axes.labelsize": 16,
+    "xtick.labelsize": 13,
+    "ytick.labelsize": 13,
+    "legend.fontsize": 13,
+    "mathtext.fontset": "cm",
+    "font.family": "serif"
+})
+
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}
@@ -56,7 +72,7 @@ if torch_backend:
     P_IO = torch_backend.from_device(P_IO)
 print("P_mu->e max (NO, ν):", P_NO.max(), "  P_mu->e max (IO, ν̄):", P_IO.max())
 
-E_GeV = np.logspace(-1, 2, 400)     # x
+E_GeV = np.logspace(-1, 2, 480)     # x
 cosz  = np.linspace(-1.0, 1.0, 240)     # y (upgoing)
 prem  = PREMModel()
 
@@ -79,16 +95,6 @@ if torch_backend:
     P1 = torch_backend.from_device(P1)
 
 print("max |ΔP| prem vs hist =", np.max(np.abs(P1-P2)))
-
-
-
-
-# P_mue  = np.zeros((cosz.size, E_GeV.size))
-# P_mumu = np.zeros_like(P_mue)
-
-# choose one:
-SCHEME = "prem_layers"      # exact PREM shells
-# SCHEME = "hist_density"   # fine histogram of density along path
 
 # --- arrays to hold all 4 panels ---
 P_mue      = np.zeros((len(cosz), len(E_GeV)))
@@ -132,21 +138,53 @@ try:
 except Exception:
     pass
 
-# ---------- plotting (2×2) ----------
-def draw(ax, X, Y, Z, title, vmax=1.0):
-    E_edges = np.geomspace(X.min(), X.max(), X.size + 1)
-    CZ_edges = np.linspace(Y.min(), Y.max(), Y.size + 1)
-    pc = ax.pcolormesh(E_edges, CZ_edges, Z, vmin=0.0, vmax=vmax, shading="auto", cmap="inferno")
-    ax.set_xscale("log")
-    ax.set_xlabel(r"$E_\nu$ [GeV]")
-    ax.set_ylabel(r"$\cos\theta_z$")
-    ax.set_title(title)
-    cbar = plt.colorbar(pc, ax=ax, pad=0.01)
-    cbar.set_label("Probability")
+E_edges  = np.geomspace(E_GeV.min(), E_GeV.max(), E_GeV.size + 1)
+CZ_edges = np.linspace(cosz.min(),  cosz.max(),  cosz.size  + 1)
 
-fig, axs = plt.subplots(2, 2, figsize=(10, 8), dpi=150, constrained_layout=True)
-draw(axs[0,0], E_GeV, cosz, P_mue,      r"$P(\nu_\mu\to\nu_e)$")
-draw(axs[0,1], E_GeV, cosz, P_mumu,     r"$P(\nu_\mu\to\nu_\mu)$")
-draw(axs[1,0], E_GeV, cosz, P_mue_bar,  r"$P(\bar{\nu}_\mu\to\bar{\nu}_e)$")
-draw(axs[1,1], E_GeV, cosz, P_mumu_bar, r"$P(\bar{\nu}_\mu\to\bar{\nu}_\mu)$")
+def draw_panel(ax, Z, label_tex, text_color, fontsize=20):
+    pc = ax.pcolormesh(
+        E_edges, CZ_edges, Z,
+        vmin=0.0, vmax=1.0, shading="auto",
+        cmap="inferno_r"
+    )
+    ax.set_xscale("log")
+
+    # add grid lines
+    # ax.grid(True, which="both", color="w", alpha=0.25, lw=0.5)
+    ax.grid(True, which="both", color="w", alpha=0.3, lw=0.4, ls="--")
+    # optional: add minor ticks for better readability
+    # ax.minorticks_on()
+
+    ax.text(0.96, 0.96, label_tex,
+            transform=ax.transAxes, ha="right", va="top",
+            color=text_color, fontsize=fontsize, weight="bold")
+    return pc
+
+# --- create figure with constrained layout (better with colorbars) ---
+fig, axs = plt.subplots(
+    2, 2, figsize=(9.8, 8.0),
+    dpi=150,
+    constrained_layout=True
+)
+
+# draw all panels
+m0 = draw_panel(axs[0,0], P_mue,      r"$P_{\nu_\mu \rightarrow \nu_e}$",      "black")
+_  = draw_panel(axs[0,1], P_mumu,     r"$P_{\nu_\mu \rightarrow \nu_\mu}$",    "white")
+_  = draw_panel(axs[1,0], P_mue_bar,  r"$P_{\bar{\nu}_\mu \rightarrow \bar{\nu}_e}$",  "black")
+_  = draw_panel(axs[1,1], P_mumu_bar, r"$P_{\bar{\nu}_\mu \rightarrow \bar{\nu}_\mu}$","white")
+
+# axis labels
+for ax in axs[0,:]:
+    ax.set_xlabel("")
+for ax in axs[:,1]:
+    ax.set_ylabel("")
+for ax in axs[1,:]:
+    ax.set_xlabel(r"$E_\nu$ [GeV]")
+for ax in axs[:,0]:
+    ax.set_ylabel(r"$\cos\theta_z$")
+
+# single colorbar (automatically aligned to full figure height)
+cbar = fig.colorbar(m0, ax=axs, location="right", fraction=0.05, pad=0.03)
+cbar.set_label("Oscillation probability", labelpad=10, fontsize=13)
+
 plt.show()
