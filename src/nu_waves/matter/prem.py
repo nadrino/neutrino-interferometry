@@ -113,122 +113,97 @@ class PREMModel:
                             nbins_density: int = 24,
                             merge_tol: float = 0.0,
                             h_atm_km: float = 15.0) -> MatterProfile:
-        """
-        Build a MatterProfile for a chord at cosine-zenith 'cosz'.
-        scheme:
-          - "prem_layers": cut at PREM boundaries intersected by the chord.
-          - "hist_density": sample uniformly along the chord (n_bins),
-                            bin density into 'nbins_density' bins, and merge contiguous bins.
+        cz = float(cosz)
+        Ltot = self._chord_length_km(cz)
+        b = self._impact_parameter_km(cz)
 
-        merge_tol: optional tolerance on density (g/cm^3) to merge adjacent segments in 'hist_density'.
-        """
-        Ltot = self._chord_length_km(cosz)
-        if Ltot <= 0.0:
-            # No Earth crossing: return zero-length layer (vacuum propagation elsewhere if desired)
-            return MatterProfile([MatterLayer(self.rho(6371.0), self.Ye(6371.0), 0.0, "absolute")])
+        layers: list[MatterLayer] = []
 
-        b = self._impact_parameter_km(cosz)
-        half = 0.5 * Ltot
+        # --- Earth chord (only if upgoing) ---
+        if Ltot > 0.0:
+            half = 0.5 * Ltot
 
-        # Parameterize chord by t ∈ [-L/2, +L/2], r(t) = sqrt(b^2 + t^2)
-        def r_of_t(t): return np.sqrt(b*b + t*t)
+            def r_of_t(t):
+                return np.sqrt(b * b + t * t)
 
-        if scheme == "prem_layers":
-            # find intersection t's where r(t) equals a PREM boundary
-            t_points = [-half, +half]
-            for rb in self.prem_boundaries_km[1:-1]:  # skip center and surface (already in)
-                if rb > b:  # intersects the chord if boundary radius > impact parameter
-                    dt = np.sqrt(rb*rb - b*b)
-                    t_points.append(-dt)
-                    t_points.append(+dt)
-            t_points = np.array(sorted(tp for tp in t_points if -half <= tp <= half))
+            if scheme == "prem_layers":
+                # cut at PREM boundaries intersected by the chord
+                t_pts = [-half, +half]
+                for rb in self.prem_boundaries_km[1:-1]:
+                    if rb > b:
+                        dt = np.sqrt(rb * rb - b * b)
+                        t_pts += [-dt, +dt]
+                t_pts = np.array(sorted(tp for tp in t_pts if -half <= tp <= half))
+                for t0, t1 in zip(t_pts[:-1], t_pts[1:]):
+                    dL = float(t1 - t0)
+                    r_mid = r_of_t(0.5 * (t0 + t1))
+                    rho_mid = float(self.rho(r_mid))
+                    Ye_mid = float(self.Ye(r_mid))
+                    layers.append(MatterLayer(rho_mid, Ye_mid, dL, "absolute"))
 
-            layers: list[MatterLayer] = []
-            for t0, t1 in zip(t_points[:-1], t_points[1:]):
-                dL = float(t1 - t0)
-                r_mid = r_of_t(0.5*(t0 + t1))
-                rho_mid = float(self.rho(r_mid))
-                Ye_mid  = float(self.Ye(r_mid))
-                layers.append(MatterLayer(rho_mid, Ye_mid, dL, "absolute"))
+            elif scheme == "hist_density":
+                t_edges = np.linspace(-half, +half, n_bins + 1)
+                t_mid = 0.5 * (t_edges[:-1] + t_edges[1:])
+                dL = np.diff(t_edges)
+                r_mid = r_of_t(t_mid)
+                rho_mid = self.rho(r_mid)
+                Ye_mid = self.Ye(r_mid)
 
-            L_atm = self._atm_path_km(cosz, h_atm_km)
-            if L_atm > 0.0:
-                if cosz >= 0.0:
-                    layers = [MatterLayer(0.0, self.Ye_mantle, L_atm, "absolute")] + layers
-                else:
-                    half = 0.5 * L_atm
-                    layers = [MatterLayer(0.0, self.Ye_mantle, half, "absolute")] + layers + \
-                             [MatterLayer(0.0, self.Ye_mantle, half, "absolute")]
+                rmin, rmax = rho_mid.min(), rho_mid.max()
+                edges = np.linspace(rmin, rmax, nbins_density + 1)
+                idx = np.minimum(np.searchsorted(edges, rho_mid, side="right") - 1, nbins_density - 1)
 
-            return MatterProfile(layers)
+                accL = accR = accY = 0.0
+                prev = idx[0]
 
-        elif scheme == "hist_density":
-            # uniform bins in t, mid-sample density
-            t_edges = np.linspace(-half, +half, n_bins+1)
-            t_mid   = 0.5 * (t_edges[:-1] + t_edges[1:])
-            dL      = np.diff(t_edges)
-            r_mid   = r_of_t(t_mid)
-            rho_mid = self.rho(r_mid)
-            Ye_mid  = self.Ye(r_mid)
+                def flush():
+                    nonlocal accL, accR, accY
+                    if accL > 0.0:
+                        layers.append(MatterLayer(accR / accL, accY / accL, accL, "absolute"))
+                        accL = accR = accY = 0.0
 
-            # build density bins from the path's min/max
-            rmin, rmax = rho_mid.min(), rho_mid.max()
-            edges = np.linspace(rmin, rmax, nbins_density+1)
-            # create bin indices; ensure last bin inclusive
-            idx = np.minimum(np.searchsorted(edges, rho_mid, side="right")-1, nbins_density-1)
+                for i in range(len(dL)):
+                    if idx[i] != prev:
+                        flush()
+                        prev = idx[i]
+                    accL += float(dL[i])
+                    accR += float(dL[i] * rho_mid[i])
+                    accY += float(dL[i] * Ye_mid[i])
+                flush()
 
-            # merge contiguous bins with same idx, optionally by tolerance
-            layers: list[MatterLayer] = []
-            acc_L, acc_rho_sum, acc_Ye_sum, acc_n = 0.0, 0.0, 0.0, 0
-            prev_idx = idx[0]
+                if merge_tol > 0 and len(layers) > 1:
+                    merged = [layers[0]]
+                    for nxt in layers[1:]:
+                        cur = merged[-1]
+                        if abs(nxt.rho_gcm3 - cur.rho_gcm3) <= merge_tol:
+                            Lsum = cur.weight + nxt.weight
+                            merged[-1] = MatterLayer(
+                                (cur.rho_gcm3 * cur.weight + nxt.rho_gcm3 * nxt.weight) / Lsum,
+                                (cur.Ye * cur.weight + nxt.Ye * nxt.weight) / Lsum,
+                                Lsum, "absolute"
+                            )
+                        else:
+                            merged.append(nxt)
+                    layers = merged
+            else:
+                raise ValueError(f"Unknown scheme '{scheme}'")
+        # else: no Earth layers for cz>=0
 
-            def flush():
-                if acc_n == 0: return
-                # use average rho/Ye of the segment; alternatively use bin mid: (edges[prev_idx]+edges[prev_idx+1])/2
-                rho_avg = acc_rho_sum / acc_n
-                Ye_avg  = acc_Ye_sum  / acc_n
-                layers.append(MatterLayer(float(rho_avg), float(Ye_avg), float(acc_L), "absolute"))
+        # --- Atmosphere around the Earth chord (both signs of cosz) ---
+        L_atm = self._atm_path_km(cz, h_atm_km)
+        if L_atm > 0.0:
+            if cz >= 0.0:
+                # single vacuum segment (production → detector)
+                layers = [MatterLayer(0.0, self.Ye_mantle, L_atm, "absolute")] + layers
+            else:
+                # far + near vacuum shells (split evenly)
+                half = 0.5 * L_atm
+                layers = [MatterLayer(0.0, self.Ye_mantle, half, "absolute")] + \
+                         layers + \
+                         [MatterLayer(0.0, self.Ye_mantle, half, "absolute")]
 
-            for i in range(n_bins):
-                same_bin = (idx[i] == prev_idx)
-                if not same_bin:
-                    flush()
-                    acc_L, acc_rho_sum, acc_Ye_sum, acc_n = 0.0, 0.0, 0.0, 0
-                    prev_idx = idx[i]
-                # merge step
-                acc_L        += float(dL[i])
-                acc_rho_sum  += float(rho_mid[i])
-                acc_Ye_sum   += float(Ye_mid[i])
-                acc_n        += 1
+        # Ensure non-empty profile to keep the engine happy
+        if not layers:
+            layers = [MatterLayer(0.0, self.Ye_mantle, 0.0, "absolute")]
 
-            flush()
-            # optional additional merge by absolute tolerance on ρ between adjacent layers
-            if merge_tol > 0 and len(layers) > 1:
-                merged: list[MatterLayer] = []
-                cur = layers[0]
-                for nxt in layers[1:]:
-                    if abs(nxt.rho_gcm3 - cur.rho_gcm3) <= merge_tol:
-                        # merge in place
-                        totL = cur.weight + nxt.weight
-                        rho_avg = (cur.rho_gcm3*cur.weight + nxt.rho_gcm3*nxt.weight) / totL
-                        Ye_avg  = (cur.Ye*cur.weight       + nxt.Ye*nxt.weight)         / totL
-                        cur = MatterLayer(rho_avg, Ye_avg, totL, "absolute")
-                    else:
-                        merged.append(cur)
-                        cur = nxt
-                merged.append(cur)
-                layers = merged
-
-            L_atm = self._atm_path_km(cosz, h_atm_km)
-            if L_atm > 0.0:
-                if cosz >= 0.0:
-                    layers = [MatterLayer(0.0, self.Ye_mantle, L_atm, "absolute")] + layers
-                else:
-                    half = 0.5 * L_atm
-                    layers = [MatterLayer(0.0, self.Ye_mantle, half, "absolute")] + layers + \
-                             [MatterLayer(0.0, self.Ye_mantle, half, "absolute")]
-
-            return MatterProfile(layers)
-
-        else:
-            raise ValueError(f"Unknown scheme '{scheme}'. Use 'prem_layers' or 'hist_density'.")
+        return MatterProfile(layers)

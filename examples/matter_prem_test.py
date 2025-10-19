@@ -60,6 +60,10 @@ E_GeV = np.logspace(-1, 2, 400)     # x
 cosz  = np.linspace(-1.0, 1.0, 240)     # y (upgoing)
 prem  = PREMModel()
 
+# test for thickness
+prof = prem.profile_from_coszen(+0.3, h_atm_km=15.0)
+print("L_tot(downgoing) =", sum(L.weight for L in prof.layers))  # ≈ 15 km
+
 prof1 = prem.profile_from_coszen(-1, scheme="prem_layers")
 prof2 = prem.profile_from_coszen(-1, scheme="hist_density", n_bins=4000, nbins_density=60)
 osc.set_layered_profile(prof1); P1 = osc.probability(L_km=sum(l.weight for l in prof1.layers), E_GeV=E, alpha=1, beta=0)
@@ -78,8 +82,8 @@ P_mue  = np.zeros((cosz.size, E_GeV.size))
 P_mumu = np.zeros_like(P_mue)
 
 # choose one:
-# SCHEME = "prem_layers"      # exact PREM shells
-SCHEME = "hist_density"   # fine histogram of density along path
+SCHEME = "prem_layers"      # exact PREM shells
+# SCHEME = "hist_density"   # fine histogram of density along path
 
 for iy, cz in tqdm(enumerate(cosz), total=len(cosz)):
     prof = prem.profile_from_coszen(cz, scheme=SCHEME, n_bins=1200, nbins_density=36, merge_tol=0.0)
