@@ -171,3 +171,4 @@ cbar.set_label("Oscillation probability", labelpad=10, fontsize=13)
 
 plt.show()
 plt.savefig("../figures/matter_prem_test.pdf")
+plt.savefig("../figures/matter_prem_test.png")

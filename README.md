@@ -9,6 +9,7 @@ You can input your own parameters and get the oscillation probabilities.
 
 ## Features
 
+- Embedded GPU acceleration (MPS, CUDA)
 - Oscillation framework with `N` neutrinos
 - Vacuum oscillations
 - Constant matter MSW
@@ -16,9 +17,9 @@ You can input your own parameters and get the oscillation probabilities.
 - Earth model (PREM) with `cosz`
 - Adiabatic transitions
 
-## Pictures
+## Demonstration
 
-[matter_prem_test.pdf](figures/matter_prem_test.pdf)
+![matter_prem_test.png](figures/matter_prem_test.png)
 
 
 ## Examples

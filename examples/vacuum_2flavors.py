@@ -106,4 +106,5 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
+plt.savefig("../figures/vacuum_2flavors.png")
 plt.savefig("../figures/vacuum_2flavors.pdf")
