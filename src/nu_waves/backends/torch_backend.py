@@ -109,6 +109,10 @@ def make_torch_mps_backend(seed: int | None = None, use_complex64: bool = True) 
                 # Fallback: CPU eigh, then move results back to A.device
                 dev = A.device
                 A_cpu = A.detach().to("cpu")
+                # if A_cpu.dtype.is_complex:
+                #     A_cpu = A_cpu.to(torch.complex128)
+                # else:
+                #     A_cpu = A_cpu.to(torch.float64)
                 w_cpu, V_cpu = torch.linalg.eigh(A_cpu)
                 return w_cpu.to(dev), V_cpu.to(dev)
 
