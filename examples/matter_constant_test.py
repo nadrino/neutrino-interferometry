@@ -5,6 +5,8 @@ from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import VacuumOscillator
 import nu_waves.utils.flavors as flavors
 
+
+
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}
@@ -83,5 +85,7 @@ plt.xlim(E.min(), E.max())
 plt.ylim(0, 0.3)
 plt.legend(ncol=2, frameon=False)
 plt.tight_layout()
+
+plt.savefig("../figures/matter_constant_test.jpg", dpi=150)
 plt.show()
 

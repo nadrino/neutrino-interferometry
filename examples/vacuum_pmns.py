@@ -47,7 +47,7 @@ plt.xlim(E_min, E_max)
 plt.ylim(0, 1.05)
 plt.legend()
 plt.tight_layout()
+
+plt.savefig("../figures/vacuum_pmns.jpg", dpi=150)
 plt.show()
 
-plt.savefig("../figures/vacuum_pmns.png")
-plt.savefig("../figures/vacuum_pmns.pdf")

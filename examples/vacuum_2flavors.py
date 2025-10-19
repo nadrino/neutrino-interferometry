@@ -7,8 +7,8 @@ from nu_waves.backends import make_torch_mps_backend
 import nu_waves.utils.flavors as flavors
 
 # toggle GPU
-# torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = None
+# torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
 
 # sterile test
 osc_amplitude = 0.2 # sin^2(2\theta)
@@ -78,7 +78,7 @@ def energy_sampler_sqrt(E_center, n, a=0.008):
 
 # osc.baseline_sampler = baseline_sampler_gauss
 osc.energy_sampler = energy_sampler_sqrt
-osc.n_samples = 100
+osc.n_samples = 1000
 P_damp = osc.probability(
     L_km=L_list, E_GeV=E_fixed,
     alpha=flavors.electron,
@@ -104,7 +104,6 @@ plt.title(f"eV$^2$ sterile with $E_\\nu$ = {E_fixed*1000} MeV")
 plt.ylim(0, 1.05)
 plt.legend()
 plt.tight_layout()
-plt.show()
 
-plt.savefig("../figures/vacuum_2flavors.png")
-plt.savefig("../figures/vacuum_2flavors.pdf")
+plt.savefig("../figures/vacuum_2flavors.jpg", dpi=150)
+plt.show()

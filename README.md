@@ -12,15 +12,20 @@ You can input your own parameters and get the oscillation probabilities.
 - Embedded GPU acceleration (MPS, CUDA)
 - Oscillation framework with `N` neutrinos
 - Vacuum oscillations
+- Custom smearing function (L and E)
 - Constant matter MSW
 - Multi-layer matter MSW
 - Earth model (PREM) with `cosz`
 - Adiabatic transitions
 
-## Demonstration
+## Some nice pictures
 
-![matter_prem_test.png](figures/matter_prem_test.png)
-
+![vacuum_pmns.jpg](figures/vacuum_pmns.jpg)
+![matter_constant_test.jpg](figures/matter_constant_test.jpg)
+![matter_prem_test.jpg](figures/matter_prem_test.jpg)
+![adiabatic_sun_ssm_test.jpg](figures/adiabatic_sun_ssm_test.jpg)
+![vacuum_2d_pmns.jpg](figures/vacuum_2d_pmns.jpg)
+![vacuum_2flavors.jpg](figures/vacuum_2flavors.jpg)
 
 ## Examples
 
