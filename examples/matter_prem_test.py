@@ -64,6 +64,11 @@ prem  = PREMModel()
 prof = prem.profile_from_coszen(+0.3, h_atm_km=15.0)
 print("L_tot(downgoing) =", sum(L.weight for L in prof.layers))  # ≈ 15 km
 
+for cz in (-1e-3, +1e-3):
+    prof = prem.profile_from_coszen(cz, h_atm_km=15.0)
+    print(cz, "L_atm =",
+          sum(L.weight for L in prof.layers if L.rho_gcm3==0.0))
+
 prof1 = prem.profile_from_coszen(-1, scheme="prem_layers")
 prof2 = prem.profile_from_coszen(-1, scheme="hist_density", n_bins=4000, nbins_density=60)
 osc.set_layered_profile(prof1); P1 = osc.probability(L_km=sum(l.weight for l in prof1.layers), E_GeV=E, alpha=1, beta=0)
