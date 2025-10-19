@@ -83,56 +83,70 @@ print("max |ΔP| prem vs hist =", np.max(np.abs(P1-P2)))
 
 
 
-P_mue  = np.zeros((cosz.size, E_GeV.size))
-P_mumu = np.zeros_like(P_mue)
+# P_mue  = np.zeros((cosz.size, E_GeV.size))
+# P_mumu = np.zeros_like(P_mue)
 
 # choose one:
 SCHEME = "prem_layers"      # exact PREM shells
 # SCHEME = "hist_density"   # fine histogram of density along path
 
+# --- arrays to hold all 4 panels ---
+P_mue      = np.zeros((len(cosz), len(E_GeV)))
+P_mumu     = np.zeros_like(P_mue)
+P_mue_bar  = np.zeros_like(P_mue)
+P_mumu_bar = np.zeros_like(P_mue)
+
 for iy, cz in tqdm(enumerate(cosz), total=len(cosz)):
-    prof = prem.profile_from_coszen(cz, scheme=SCHEME, n_bins=1200, nbins_density=36, merge_tol=0.0)
+    # 1) build PREM profile for this cos(zenith)
+    prof = prem.profile_from_coszen(
+        cz, scheme=SCHEME,
+        n_bins=1200, nbins_density=36, merge_tol=0.0,  # keep your knobs
+        h_atm_km=15.0                                   # thin atmosphere (your choice)
+    )
     osc.set_layered_profile(prof)
 
-    # total path length is sum of absolute segments
+    # 2) total baseline for this row (sum of absolute segments)
     L_tot = float(sum(layer.weight for layer in prof.layers))
 
-    P_mue_i  = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=0)
-    P_mumu_i = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=1)
+    # 3) compute ν and ν̄ for the two channels
+    P_mue_i      = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=0, antineutrino=False)
+    P_mumu_i     = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=1, antineutrino=False)
+    P_mue_bar_i  = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=0, antineutrino=True)
+    P_mumu_bar_i = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=1, antineutrino=True)
 
+    # 4) move from device if needed
     if torch_backend is not None:
-        P_mue[iy] = torch_backend.from_device(P_mue_i)
-        P_mumu[iy] = torch_backend.from_device(P_mumu_i)
+        P_mue[iy]      = torch_backend.from_device(P_mue_i)
+        P_mumu[iy]     = torch_backend.from_device(P_mumu_i)
+        P_mue_bar[iy]  = torch_backend.from_device(P_mue_bar_i)
+        P_mumu_bar[iy] = torch_backend.from_device(P_mumu_bar_i)
     else:
-        P_mue[iy] = P_mue_i
-        P_mumu[iy] = P_mumu_i
+        P_mue[iy], P_mumu[iy] = P_mue_i, P_mumu_i
+        P_mue_bar[iy], P_mumu_bar[iy] = P_mue_bar_i, P_mumu_bar_i
 
+# (optional) synchronize GPU timing before plotting
+try:
+    import torch
+    if torch.backends.mps.is_available(): torch.mps.synchronize()
+    elif torch.cuda.is_available():       torch.cuda.synchronize()
+except Exception:
+    pass
 
-def draw(ax, X, Y, Z, title):
-    # im = ax.imshow(Z, origin="lower", aspect="auto",
-    #                extent=[X.min(), X.max(), Y.min(), Y.max()],
-    #                vmin=0.0, vmax=1.0, interpolation="nearest", cmap='inferno')
-    E_edges = np.geomspace(0.1, 100.0, len(E_GeV) + 1)
-    E_centers = np.sqrt(E_edges[:-1] * E_edges[1:])  # compute P on centers
-    CZ_edges = np.linspace(-1.0, 1.0, len(cosz) + 1)
-    pc = ax.pcolormesh(
-        E_edges, CZ_edges, Z,
-        vmin=0, vmax=1,
-        cmap="inferno",
-        shading="auto",
-    )
-    ax.set_xscale('log')
+# ---------- plotting (2×2) ----------
+def draw(ax, X, Y, Z, title, vmax=1.0):
+    E_edges = np.geomspace(X.min(), X.max(), X.size + 1)
+    CZ_edges = np.linspace(Y.min(), Y.max(), Y.size + 1)
+    pc = ax.pcolormesh(E_edges, CZ_edges, Z, vmin=0.0, vmax=vmax, shading="auto", cmap="inferno")
+    ax.set_xscale("log")
     ax.set_xlabel(r"$E_\nu$ [GeV]")
     ax.set_ylabel(r"$\cos\theta_z$")
     ax.set_title(title)
     cbar = plt.colorbar(pc, ax=ax, pad=0.01)
     cbar.set_label("Probability")
 
-fig, axs = plt.subplots(
-    1, 2, figsize=(11, 4.2),
-    dpi=150,
-    constrained_layout=True
-)
-draw(axs[0], E_GeV, cosz, P_mue,  r"$P(\nu_\mu\to\nu_e)$ — PREM refined")
-draw(axs[1], E_GeV, cosz, P_mumu, r"$P(\nu_\mu\to\nu_\mu)$ — PREM refined")
+fig, axs = plt.subplots(2, 2, figsize=(10, 8), dpi=150, constrained_layout=True)
+draw(axs[0,0], E_GeV, cosz, P_mue,      r"$P(\nu_\mu\to\nu_e)$")
+draw(axs[0,1], E_GeV, cosz, P_mumu,     r"$P(\nu_\mu\to\nu_\mu)$")
+draw(axs[1,0], E_GeV, cosz, P_mue_bar,  r"$P(\bar{\nu}_\mu\to\bar{\nu}_e)$")
+draw(axs[1,1], E_GeV, cosz, P_mumu_bar, r"$P(\bar{\nu}_\mu\to\bar{\nu}_\mu)$")
 plt.show()
