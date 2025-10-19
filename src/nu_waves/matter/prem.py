@@ -89,22 +89,14 @@ class PREMModel:
 
     # atmosphere thickness
     def _atm_path_km(self, cosz: float, h_km: float) -> float:
-        """Line-of-sight path length through a thin shell from radius R to R+h."""
         if h_km <= 0: return 0.0
         R, Rp = self.R_earth_km, self.R_earth_km + h_km
         b = self._impact_parameter_km(cosz)
-        if b >= Rp:  # grazing above atmosphere
+        if b >= Rp:  # ray misses the atmosphere
             return 0.0
-
-        def seg(r):
-            return np.sqrt(max(r * r - b * b, 0.0))
-
-        if cosz >= 0.0:
-            # one segment (production→detector)
-            return seg(Rp) - seg(R)
-        else:
-            # two segments (far + near side)
-            return 2.0 * (seg(Rp) - seg(R))
+        seg = lambda r: np.sqrt(max(r * r - b * b, 0.0))
+        # ONE segment from production altitude Rp down to the surface R, irrespective of sign(cosz)
+        return seg(Rp) - seg(R)
 
     # --- layer builders ---
     def profile_from_coszen(self, cosz: float,
@@ -190,17 +182,13 @@ class PREMModel:
         # else: no Earth layers for cz>=0
 
         # --- Atmosphere around the Earth chord (both signs of cosz) ---
-        L_atm = self._atm_path_km(cz, h_atm_km)
+        L_atm = self._atm_path_km(cosz, h_atm_km)
         if L_atm > 0.0:
-            if cz >= 0.0:
-                # single vacuum segment (production → detector)
-                layers = [MatterLayer(0.0, self.Ye_mantle, L_atm, "absolute")] + layers
-            else:
-                # far + near vacuum shells (split evenly)
-                half = 0.5 * L_atm
-                layers = [MatterLayer(0.0, self.Ye_mantle, half, "absolute")] + \
-                         layers + \
-                         [MatterLayer(0.0, self.Ye_mantle, half, "absolute")]
+            atm = MatterLayer(0.0, self.Ye_mantle, L_atm, "absolute")
+            if Ltot > 0.0:  # upgoing: atmosphere is on the FAR side, before Earth
+                layers = [atm] + layers
+            else:  # downgoing: atmosphere is on the NEAR side, straight to detector
+                layers = [atm]
 
         # Ensure non-empty profile to keep the engine happy
         if not layers:
