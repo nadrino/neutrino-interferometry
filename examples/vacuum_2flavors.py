@@ -79,7 +79,6 @@ def energy_sampler_sqrt(E_center, n, a=0.008):
     E_safe = xp.maximum(E, 1e-12)
     sigma = a * xp.sqrt(E_safe)
     out = xp.normal(loc=E[..., None], scale=sigma[..., None], size=E.shape + (n,))
-    print("out.shape",out.shape)
     return out
 
 # osc.baseline_sampler = baseline_sampler_gauss
