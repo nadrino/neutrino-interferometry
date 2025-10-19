@@ -42,10 +42,6 @@ P_mue = osc.probability(L_km=L_vals, E_GeV=E_vals, alpha=1, beta=0)   # (nL, nE)
 # alpha=1 (muon), beta=1 (muon) → disappearance
 P_mumu = osc.probability(L_km=L_vals, E_GeV=E_vals, alpha=1, beta=1)  # (nL, nE)
 
-if torch_backend is not None:
-    P_mue = torch_backend.from_device(P_mue)
-    P_mumu = torch_backend.from_device(P_mumu)
-
 t1 = time.perf_counter()
 print(f"Computation time: {t1 - t0:.3f} s")
 

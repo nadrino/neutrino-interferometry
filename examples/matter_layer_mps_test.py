@@ -53,8 +53,7 @@ def run_once(backend_name="numpy"):
         np.testing.assert_allclose(P_full.sum(axis=-2), 1.0, atol=2e-6)
     else:
         # bring to host for the assertion
-        P_full_np = backend.from_device(P_full)
-        np.testing.assert_allclose(P_full_np.sum(axis=-2), 1.0, atol=2e-5)
+        np.testing.assert_allclose(P_full.sum(axis=-2), 1.0, atol=2e-5)
 
     return backend, P_mue, P_mumu
 
@@ -85,11 +84,7 @@ if __name__ == "__main__":
     P_mue_mps  = osc_mps.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0)
     P_mumu_mps = osc_mps.probability(L_km=L_km, E_GeV=E, alpha=1, beta=1)
 
-    # Compare with NumPy (looser tol for complex64)
-    P_mue_mps_np  = torch_backend.from_device(P_mue_mps)
-    P_mumu_mps_np = torch_backend.from_device(P_mumu_mps)
-
-    np.testing.assert_allclose(P_mue_np,  P_mue_mps_np,  rtol=5e-4, atol=5e-5)
-    np.testing.assert_allclose(P_mumu_np, P_mumu_mps_np, rtol=5e-4, atol=5e-5)
+    np.testing.assert_allclose(P_mue_np,  P_mue_mps,  rtol=5e-4, atol=5e-5)
+    np.testing.assert_allclose(P_mumu_np, P_mumu_mps, rtol=5e-4, atol=5e-5)
 
     print("MPS layered propagation parity: OK")

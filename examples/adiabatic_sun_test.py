@@ -8,8 +8,8 @@ from nu_waves.matter.solar import SolarProfile
 from nu_waves.backends import make_torch_mps_backend
 
 # toggle for CPU/GPU
-# torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = None
+# torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
@@ -48,10 +48,6 @@ F = osc.adiabatic_mass_fractions_from_emission(
     s_km=s,
     alpha=0
 )
-
-
-if torch_backend is not None:
-    F = torch_backend.from_device(F)
 
 # plot (log radius or symlog distance—your pick)
 x = s / 1e5

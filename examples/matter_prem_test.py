@@ -56,10 +56,6 @@ prof_rev = MatterProfile.from_segments(
 osc.set_layered_profile(prof_rev)
 P_rev = osc.probability(L_km=sum(l.weight for l in prof_rev.layers), E_GeV=E, alpha=1, beta=0)
 
-if torch_backend:
-    P_rev = torch_backend.from_device(P_rev)
-    P_fwd = torch_backend.from_device(P_fwd)
-
 print("max |ΔP| (fwd vs rev) =", np.max(np.abs(P_fwd - P_rev)))  # should be >> 1e-3
 
 L = 8000.0
@@ -67,9 +63,6 @@ E = np.linspace(1, 10, 400)
 P_NO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0)              # neutrinos, NO
 P_IO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0, antineutrino=True)  # ν̄ in IO has the resonance
 
-if torch_backend:
-    P_NO = torch_backend.from_device(P_NO)
-    P_IO = torch_backend.from_device(P_IO)
 print("P_mu->e max (NO, ν):", P_NO.max(), "  P_mu->e max (IO, ν̄):", P_IO.max())
 
 E_GeV = np.logspace(-1, 2, 480)     # x
@@ -89,10 +82,6 @@ prof1 = prem.profile_from_coszen(-1, scheme="prem_layers")
 prof2 = prem.profile_from_coszen(-1, scheme="hist_density", n_bins=4000, nbins_density=60)
 osc.set_layered_profile(prof1); P1 = osc.probability(L_km=sum(l.weight for l in prof1.layers), E_GeV=E, alpha=1, beta=0)
 osc.set_layered_profile(prof2); P2 = osc.probability(L_km=sum(l.weight for l in prof2.layers), E_GeV=E, alpha=1, beta=0)
-
-if torch_backend:
-    P2 = torch_backend.from_device(P2)
-    P1 = torch_backend.from_device(P1)
 
 print("max |ΔP| prem vs hist =", np.max(np.abs(P1-P2)))
 
@@ -120,15 +109,8 @@ for iy, cz in tqdm(enumerate(cosz), total=len(cosz)):
     P_mue_bar_i  = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=0, antineutrino=True)
     P_mumu_bar_i = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=1, antineutrino=True)
 
-    # 4) move from device if needed
-    if torch_backend is not None:
-        P_mue[iy]      = torch_backend.from_device(P_mue_i)
-        P_mumu[iy]     = torch_backend.from_device(P_mumu_i)
-        P_mue_bar[iy]  = torch_backend.from_device(P_mue_bar_i)
-        P_mumu_bar[iy] = torch_backend.from_device(P_mumu_bar_i)
-    else:
-        P_mue[iy], P_mumu[iy] = P_mue_i, P_mumu_i
-        P_mue_bar[iy], P_mumu_bar[iy] = P_mue_bar_i, P_mumu_bar_i
+    P_mue[iy], P_mumu[iy] = P_mue_i, P_mumu_i
+    P_mue_bar[iy], P_mumu_bar[iy] = P_mue_bar_i, P_mumu_bar_i
 
 # (optional) synchronize GPU timing before plotting
 try:

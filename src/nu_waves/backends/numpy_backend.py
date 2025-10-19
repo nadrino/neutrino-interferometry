@@ -1,36 +1,95 @@
-import numpy as _np
-from .interface import ArrayBackend
+import numpy as np
 
 class _NumpyXP:
-    def __init__(self, np):
-        self._np = np
-    def __getattr__(self, name): return getattr(self._np, name)
-    def repeat_last(self, x, n): return self._np.repeat(x[..., self._np.newaxis], n, axis=-1)
+    def __init__(self):
+        # allow x[..., xp.newaxis] in user code
+        self.newaxis = np.newaxis
+
+    def __getattr__(self, name):
+        # fallback to numpy for anything we didn't wrap explicitly
+        if hasattr(np, name):
+            return getattr(np, name)
+        raise AttributeError(f"_NumpyXP has no attribute {name}")
+
+    # common helpers used by the codebase
+    def asarray(self, x, dtype=None):
+        return np.asarray(x, dtype=dtype)
+
+    def repeat_last(self, x, n):
+        return np.repeat(x[..., np.newaxis], n, axis=-1)
+
+    def isscalar(self, x):
+        return np.isscalar(x)
+
+    def stack(self, arrays, axis=0):
+        return np.stack(arrays, axis=axis)
+
+    def argmax(self, x, axis=None):
+        return np.argmax(x, axis=axis)
+
+    def angle(self, z):
+        return np.angle(z)
+
+    def eye(self, n, dtype=None):
+        return np.eye(n, dtype=dtype)
+
+    def abs(self, x):
+        return np.abs(x)
+
+    def conj(self, x):
+        return np.conjugate(x)
+
+    def conjugate(self, x):
+        return np.conjugate(x)
+
+    def exp(self, x):
+        return np.exp(x)
+
+    def einsum(self, subs, *ops):
+        return np.einsum(subs, *ops)
+
 
 class _NumpyLinalg:
-    @staticmethod
-    def eigh(A):
-        return _np.linalg.eigh(A)  # batched OK
+    def eigh(self, A):
+        # works for (N,N) or (...,N,N)
+        return np.linalg.eigh(A)
 
-    @staticmethod
-    def matrix_exp(A):
+    def matrix_exp(self, A):
         """
-        Exp for skew-Hermitian A (our use case: A = -i * H * L, with H Hermitian).
-        Uses: exp(A) = V diag(exp(-i * w)) V^† where iA = V diag(w) V^†, w real.
+        Stable numpy implementation without SciPy: eig-based exp.
+        Supports (N,N) or (...,N,N).
         """
-        B = 1j * A                                # iA is Hermitian
-        w, V = _np.linalg.eigh(B)                 # (..., N), (..., N, N)
-        ew = _np.exp(-1j * w)                     # (..., N), complex
-        V_scaled = V * ew[..., _np.newaxis, :]    # scale columns
-        return V_scaled @ V.conj().swapaxes(-1, -2)
+        A = np.asarray(A)
+        if A.ndim == 2:
+            w, V = np.linalg.eig(A)
+            Vinv = np.linalg.inv(V)
+            return (V * np.exp(w)[np.newaxis, :]) @ Vinv
 
-def make_numpy_backend(seed: int | None = None) -> ArrayBackend:
-    rng = _np.random.default_rng(seed)
-    xp = _NumpyXP(_np)
-    return ArrayBackend(
-        xp=xp,
-        linalg=_NumpyLinalg(),        # <-- use our shim with matrix_exp
-        rng=rng,
-        dtype_real=_np.float64,
-        dtype_complex=_np.complex128,
-    )
+        # batched
+        *b, n, _ = A.shape
+        A2 = A.reshape((-1, n, n))
+        out = np.empty_like(A2, dtype=A.dtype)
+        for i in range(A2.shape[0]):
+            w, V = np.linalg.eig(A2[i])
+            Vinv = np.linalg.inv(V)
+            out[i] = (V * np.exp(w)[np.newaxis, :]) @ Vinv
+        return out.reshape((*b, n, n))
+
+
+def make_numpy_backend(seed=0):
+    class Backend: ...
+    backend = Backend()
+    backend.device = "cpu"
+    backend.dtype_real = np.float64
+    backend.dtype_complex = np.complex128
+    backend.xp = _NumpyXP()
+    backend.linalg = _NumpyLinalg()
+    backend.from_device = lambda x: np.asarray(x)
+
+    def to_device(x): return x
+    def from_device(x): return x
+
+    backend.to_device = to_device
+    backend.from_device = from_device
+
+    return backend

@@ -167,30 +167,30 @@ class VacuumOscillator:
             "<class 'nu_waves.backends.torch_backend._TorchXP'")
 
         if alpha is None and beta is None:
-            return P
+            return self.backend.from_device(P)
 
         a_scalar = xp.isscalar(a)
         b_scalar = xp.isscalar(b)
 
         if not is_torch:
             # NumPy path (unchanged)
-            if a_scalar and b_scalar:       return P[..., b, a]
-            if a_scalar and not b_scalar:   return P[..., b, a]
-            if not a_scalar and b_scalar:   return P[..., b, a]
-            return P[..., self.backend.xp.ix_(b, a)]
+            if a_scalar and b_scalar:       return self.backend.from_device(P[..., b, a])
+            if a_scalar and not b_scalar:   return self.backend.from_device(P[..., b, a])
+            if not a_scalar and b_scalar:   return self.backend.from_device(P[..., b, a])
+            return self.backend.from_device(P[..., self.backend.xp.ix_(b, a)])
         else:
             # Torch path uses index_select (advanced indexing parity)
             import torch
             to_idx = lambda x: x if isinstance(x, torch.Tensor) else torch.as_tensor(x, dtype=torch.long,
                                                                                      device=self.backend.xp.device)
             if a_scalar and b_scalar:
-                return P[..., int(b), int(a)]
+                return self.backend.from_device(P[..., int(b), int(a)])
             if a_scalar and not b_scalar:
-                return P.index_select(-2, to_idx(b))[..., int(a)]
+                return self.backend.from_device(P.index_select(-2, to_idx(b))[..., int(a)])
             if not a_scalar and b_scalar:
-                return P.index_select(-1, to_idx(a)).index_select(-2, to_idx(b))
+                return self.backend.from_device(P.index_select(-1, to_idx(a)).index_select(-2, to_idx(b)))
             # both arrays
-            P_sel = P.index_select(-2, to_idx(b)).index_select(-1, to_idx(a))  # (..., len(b), len(a))
+            P_sel = self.backend.from_device(P.index_select(-2, to_idx(b)).index_select(-1, to_idx(a)))  # (..., len(b), len(a))
             return P_sel
 
     def adiabatic_mass_fractions(
@@ -264,7 +264,7 @@ class VacuumOscillator:
         if rev:
             F = F[::-1, :]  # restore original r_km ordering
 
-        return F
+        return self.backend.from_device(F)
 
     def initial_mass_composition(
           self,

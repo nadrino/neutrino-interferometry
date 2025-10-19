@@ -68,8 +68,8 @@ try:
     osc_mps = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
     profile = MatterProfile.from_fractions([rho], [Ye], [1.0])
     osc_mps.set_layered_profile(profile)
-    P_mps = osc_mps.probability(L_km=L_km, E_GeV=E, alpha=None, beta=None)
-    P_mps_np = torch_backend.from_device(P_mps)
+    P_mps_np = osc_mps.probability(L_km=L_km, E_GeV=E, alpha=None, beta=None)
+    # P_mps_np = torch_backend.from_device(P_mps)
     np.testing.assert_allclose(P_cd, P_mps_np, rtol=5e-4, atol=5e-5)
     print("MPS one-layer parity OK")
 except Exception as e:

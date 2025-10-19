@@ -1,36 +1,52 @@
-from __future__ import annotations
-import math
+# torch_backend.py
 import torch
-from .interface import ArrayBackend
+import numpy as np
+
+def _map_dtype_torch(requested, dtype_real, dtype_complex):
+    if requested is None:
+        return dtype_real
+    # accept Python/numpy type hints used in the codebase
+    if requested in (float, np.float32, torch.float32):
+        return torch.float32
+    if requested in (np.float64, torch.float64):
+        return torch.float64
+    if requested in (complex, np.complex64, torch.complex64):
+        return torch.complex64
+    if requested in (np.complex128, torch.complex128):
+        return torch.complex128
+    # fallback to backend defaults
+    return dtype_real
+
 
 class _TorchXP:
-    """
-    Tiny shim so we can call a few NumPy-like functions from torch.
-    Only what VacuumOscillator/Hamiltonian use today.
-    """
     def __init__(self, device, dtype_real, dtype_complex):
         self.device = device
         self.dtype_real = dtype_real
         self.dtype_complex = dtype_complex
+        # allow x[..., xp.newaxis] indexing
+        self.newaxis = None
 
-    def eye(self, N, dtype=None):
-        dt = dtype if dtype is not None else self.dtype_complex
-        return torch.eye(N, dtype=dt, device=self.device)
+    def __getattr__(self, name):
+        # delegate missing ops to torch when possible
+        if hasattr(torch, name):
+            return getattr(torch, name)
+        raise AttributeError(f"_TorchXP has no attribute {name}")
 
-    # array-like
+    def broadcast_arrays(self, *xs):
+        # torch.broadcast_tensors requires tensors, not python scalars
+        ts = [x if isinstance(x, torch.Tensor) else torch.as_tensor(x, device=self.device) for x in xs]
+        return torch.broadcast_tensors(*ts)
+
     def asarray(self, x, dtype=None):
-        if isinstance(x, torch.Tensor):
-            t = x
-            if dtype is not None and t.dtype != dtype:
-                t = t.to(dtype)
-            return t.to(self.device)
-        # numpy / python
-        return torch.as_tensor(x, dtype=dtype, device=self.device)
+        dt = _map_dtype_torch(dtype, self.dtype_real, self.dtype_complex)
+        return torch.as_tensor(x, dtype=dt, device=self.device)
 
-    def zeros(self, shape, dtype=None):
-        import torch
-        dt = dtype if dtype is not None else self.dtype_real
-        return torch.zeros(shape, dtype=dt, device=self.device)
+    def repeat_last(self, x, n):
+        # x[..., None].repeat(..., n) would also work
+        return x.unsqueeze(-1).repeat_interleave(n, dim=-1)
+
+    def isscalar(self, x):
+        return not isinstance(x, torch.Tensor) or x.ndim == 0
 
     def stack(self, arrays, axis=0):
         return torch.stack(arrays, dim=axis)
@@ -39,133 +55,111 @@ class _TorchXP:
         return torch.argmax(x, dim=axis)
 
     def angle(self, z):
-        # Equivalent of numpy.angle for complex tensors
         return torch.atan2(torch.imag(z), torch.real(z))
 
-    def abs(self, x):         return torch.abs(x)
-    def exp(self, x):         return torch.exp(x)
-    def conj(self, x):        return torch.conj(x)
-    def reshape(self, x, *s): return x.reshape(*s)
-    def swapaxes(self, x, a, b): return x.swapaxes(a, b)
-    def broadcast_arrays(self, *xs):
-        # torch.broadcast_tensors requires tensors, not python scalars
-        ts = [x if isinstance(x, torch.Tensor) else torch.as_tensor(x, device=self.device) for x in xs]
-        return torch.broadcast_tensors(*ts)
-    def meshgrid(self, *xs, indexing="ij"):
-        return torch.meshgrid(*xs, indexing=indexing)
+    def eye(self, n, dtype=None):
+        dt = _map_dtype_torch(dtype, self.dtype_real, self.dtype_complex)
+        return torch.eye(n, dtype=dt, device=self.device)
 
-    def repeat_last(self, x, n):  # used to tile samples along a new last axis
-        return x.unsqueeze(-1).repeat(*([1] * x.ndim), n)
+    def abs(self, x):
+        return torch.abs(x)
 
-    def arange(self, N): return torch.arange(N, device=self.device)
-
-    def einsum(self, subscripts, *operands): return torch.einsum(subscripts, *operands)
-    def broadcast_to(self, x, shape): return torch.broadcast_to(x, shape)
-
-    def isscalar(self, x):
-        # Behave like numpy.isscalar: True for Python numbers or 0-D tensors
-        if isinstance(x, (int, float, complex, bool)):
-            return True
-        if isinstance(x, torch.Tensor) and x.ndim == 0:
-            return True
-        return False
-
-    def conjugate(self, x):  # alias for NumPy-compat
+    def conj(self, x):
         return torch.conj(x)
 
-    # numpy-compat helpers used in selection
-    def ix_(self, b_idx, a_idx):
-        # returns index "grids" for advanced indexing; keep on device
-        b = b_idx if isinstance(b_idx, torch.Tensor) else torch.as_tensor(b_idx, dtype=torch.long, device=self.device)
-        a = a_idx if isinstance(a_idx, torch.Tensor) else torch.as_tensor(a_idx, dtype=torch.long, device=self.device)
-        return torch.meshgrid(b, a, indexing="ij")
+    def conjugate(self, x):
+        return torch.conj(x)
 
-    newaxis = None  # not used; `unsqueeze` is used instead
+    def exp(self, x):
+        return torch.exp(x)
 
-def make_torch_mps_backend(seed: int | None = None, use_complex64: bool = True) -> ArrayBackend:
-    if not torch.backends.mps.is_available():
-        # fallback to CPU torch; still useful for parity testing
-        device = torch.device("cpu")
-    else:
-        device = torch.device("mps")
+    def einsum(self, subs, *ops):
+        return torch.einsum(subs, *ops)
 
-    # dtype policy: complex64 on MPS (faster / supported)
+    def zeros(self, shape, dtype=None):
+        dt = _map_dtype_torch(dtype, self.dtype_real, self.dtype_complex)
+        return torch.zeros(shape, dtype=dt, device=self.device)
+
+    def ones(self, shape, dtype=None):
+        dt = _map_dtype_torch(dtype, self.dtype_real, self.dtype_complex)
+        return torch.ones(shape, dtype=dt, device=self.device)
+
+    def full(self, shape, fill_value, dtype=None):
+        dt = _map_dtype_torch(dtype, self.dtype_real, self.dtype_complex)
+        return torch.full(shape, fill_value, dtype=dt, device=self.device)
+
+    def zeros_like(self, x, dtype=None):
+        dt = _map_dtype_torch(dtype, x.dtype, self.dtype_complex if x.is_complex() else self.dtype_real)
+        return torch.zeros_like(x, dtype=dt, device=x.device)
+
+    def ones_like(self, x, dtype=None):
+        dt = _map_dtype_torch(dtype, x.dtype, self.dtype_complex if x.is_complex() else self.dtype_real)
+        return torch.ones_like(x, dtype=dt, device=x.device)
+
+    def diag(self, v, diagonal=0):
+        # ensure v is on device first
+        vt = v if isinstance(v, torch.Tensor) else torch.as_tensor(v, device=self.device)
+        return torch.diag(vt, diagonal=diagonal)
+
+
+class _TorchLinalg:
+    def __init__(self, device, dtype_real, dtype_complex):
+        self.device = device
+        self.dtype_real = dtype_real
+        self.dtype_complex = dtype_complex
+
+    def eigh(self, A):
+        """
+        Deterministic & stable Hermitian eigendecomposition:
+        run on CPU in float64/complex128, then cast back.
+        Works for (N,N) or (...,N,N).
+        """
+        A_cpu = A.to("cpu")
+        if A_cpu.dtype.is_complex:
+            A_cpu = A_cpu.to(torch.complex128)
+        else:
+            A_cpu = A_cpu.to(torch.float64)
+
+        w_cpu, V_cpu = torch.linalg.eigh(A_cpu)  # batched OK
+        w = w_cpu.to(self.device, dtype=self.dtype_real)
+        V = V_cpu.to(self.device, dtype=self.dtype_complex)
+        return w, V
+
+    def matrix_exp(self, A):
+        """
+        Use CPU fallback in float64/complex128 for numerical stability
+        and MPS compatibility; cast result back to original device/dtype.
+        """
+        A_cpu = A.to("cpu")
+        if A_cpu.dtype.is_complex:
+            A_cpu = A_cpu.to(torch.complex128)
+        else:
+            A_cpu = A_cpu.to(torch.float64)
+        Y_cpu = torch.linalg.matrix_exp(A_cpu)
+        return Y_cpu.to(self.device, dtype=A.dtype)
+
+
+def make_torch_mps_backend(seed=0, use_complex64=True):
+    torch.manual_seed(seed)
+    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     dtype_real    = torch.float32 if use_complex64 else torch.float64
     dtype_complex = torch.complex64 if use_complex64 else torch.complex128
 
-    # RNG on device
-    gen = torch.Generator(device=device)
-    if seed is not None:
-        gen.manual_seed(seed)
+    class Backend: ...
+    backend = Backend()
+    backend.device = device
+    backend.dtype_real = dtype_real
+    backend.dtype_complex = dtype_complex
+    backend.xp = _TorchXP(device, dtype_real, dtype_complex)
+    backend.linalg = _TorchLinalg(device, dtype_real, dtype_complex)
 
-    xp = _TorchXP(device=device, dtype_real=dtype_real, dtype_complex=dtype_complex)
+    def to_device(x):
+        return torch.as_tensor(x, device=device)
 
-    class _TorchLinalg:
-        @staticmethod
-        def eigh(A):
-            try:
-                return torch.linalg.eigh(A)  # will raise on MPS
-            except NotImplementedError:
-                # Fallback: CPU eigh, then move results back to A.device
-                dev = A.device
-                A_cpu = A.detach().to("cpu")
-                # if A_cpu.dtype.is_complex:
-                #     A_cpu = A_cpu.to(torch.complex128)
-                # else:
-                #     A_cpu = A_cpu.to(torch.float64)
-                w_cpu, V_cpu = torch.linalg.eigh(A_cpu)
-                return w_cpu.to(dev), V_cpu.to(dev)
+    def from_device(x):
+        # detach is safe for tensors; passthrough for numpy scalars
+        return x.detach().cpu().numpy() if isinstance(x, torch.Tensor) else np.asarray(x)
 
-        @staticmethod
-        def matrix_exp(A):
-            import torch
-            try:
-                return torch.linalg.matrix_exp(A)  # native if available
-            except NotImplementedError:
-                dev = A.device
-                A_cpu = A.detach().to("cpu")
-                S_cpu = torch.linalg.matrix_exp(A_cpu)
-                return S_cpu.to(dev)
-
-    class _TorchRNG:
-        def __init__(self, generator): self.g = generator
-        def normal(self, loc, scale, size):
-            # loc/scale can be tensors with broadcastable shapes
-            if not isinstance(loc, torch.Tensor):   loc = torch.as_tensor(loc, device=device, dtype=dtype_real)
-            if not isinstance(scale, torch.Tensor): scale = torch.as_tensor(scale, device=device, dtype=dtype_real)
-            out = torch.empty(size, device=device, dtype=loc.dtype)
-            # sample standard normal then affine-transform; faster & avoids missing torch.normal broadcast on MPS versions
-            out.normal_(generator=self.g)
-            # Broadcast loc/scale to out
-            loc = loc.broadcast_to(out.shape)
-            scale = scale.broadcast_to(out.shape)
-            return out.mul_(scale).add_(loc)
-
-        def uniform(self, low, high, size):
-            if not isinstance(low, torch.Tensor):   low = torch.as_tensor(low, device=device, dtype=dtype_real)
-            if not isinstance(high, torch.Tensor): high = torch.as_tensor(high, device=device, dtype=dtype_real)
-            out = torch.empty(size, device=device, dtype=low.dtype)
-            out.uniform_(generator=self.g)
-            low  = low.broadcast_to(out.shape)
-            high = high.broadcast_to(out.shape)
-            return low + (high - low) * out
-
-    rng = _TorchRNG(gen)
-
-    class _TorchBackend(ArrayBackend):
-        def to_device(self, x):
-            if isinstance(x, torch.Tensor): return x.to(device)
-            return torch.as_tensor(x, device=device)
-        def from_device(self, x):
-            if isinstance(x, torch.Tensor):
-                try:   return x.detach().cpu().numpy()
-                except Exception: return x.detach().cpu()
-            return x
-
-    return _TorchBackend(
-        xp=xp,
-        linalg=_TorchLinalg,
-        rng=rng,
-        dtype_real=dtype_real,
-        dtype_complex=dtype_complex,
-    )
+    backend.to_device = to_device
+    backend.from_device = from_device
+    return backend

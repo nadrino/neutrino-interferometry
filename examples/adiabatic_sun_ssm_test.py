@@ -12,8 +12,8 @@ from nu_waves.propagation.oscillator import VacuumOscillator
 from nu_waves.matter.solar import load_bs05_agsop  # you added this in solar.py
 
 # toggle for CPU/GPU
-torch_backend = None
-# torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+# torch_backend = None
+torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
 
 URL = "https://www.sns.ias.edu/~jnb/SNdata/Export/BS2005/bs05_agsop.dat"
 DATA_DIR = Path("./")
@@ -59,10 +59,7 @@ F = osc.adiabatic_mass_fractions_from_emission(
 F0_vfm = osc.initial_mass_composition(
     alpha=0, basis="vacuum_from_matter", E_GeV=E_GeV, profile=sol, r_emit_km=r_emit
 )
-if torch_backend is not None:
-    F0_vfm = torch_backend.from_device(F0_vfm)
-    F = torch_backend.from_device(F)
-# np.testing.assert_allclose(F[0], F0_vfm, atol=1e-10)
+np.testing.assert_allclose(F[0], F0_vfm, atol=1e-10)
 
 # 6) Plot vs radius (log x)
 r_path = r_emit + s_km
