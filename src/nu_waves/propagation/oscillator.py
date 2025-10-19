@@ -193,3 +193,75 @@ class VacuumOscillator:
             P_sel = P.index_select(-2, to_idx(b)).index_select(-1, to_idx(a))  # (..., len(b), len(a))
             return P_sel
 
+    def adiabatic_mass_fractions(
+          self,
+          E_GeV: float | np.ndarray,
+          profile,  # SolarProfile-like: rho_gcm3(r), Ye(r)
+          r_km: np.ndarray,  # (n,) path radii (production → surface), any monotonic order
+          alpha: int = 0,
+          antineutrino: bool = False,
+    ):
+        """
+        Returns:
+          F : (n, N) phase-averaged fractions in vacuum mass eigenstates,
+              aligned with the input r_km order.
+        """
+        xp, linalg = self.backend.xp, self.backend.linalg
+        N = self.hamiltonian.U.shape[0]
+        U = self.hamiltonian.U
+
+        r_in = np.asarray(r_km, float)
+        if r_in.ndim != 1 or r_in.size < 2:
+            raise ValueError("r_km must be a 1D array with length ≥ 2.")
+
+        # Work internally with increasing radius; remember if we reversed
+        rev = r_in[0] > r_in[-1]
+        r_path = r_in[::-1] if rev else r_in
+
+        rho_np = profile.rho_gcm3(r_path)
+        Ye_np = profile.Ye(r_path)
+        H_list = []
+        for k in range(r_path.size):
+            Hk = self.hamiltonian.matter_constant(
+                E_GeV, rho_gcm3=float(rho_np[k]), Ye=float(Ye_np[k]),
+                antineutrino=antineutrino
+            )
+            H_list.append(Hk[0] if Hk.ndim == 3 else Hk)  # ensure (N,N)
+
+        H = xp.stack(H_list, axis=0)  # (n,N,N)
+        evals, evecs = linalg.eigh(H)  # (n,N), (n,N,N)
+
+        # Mode tracking (reorder columns for continuity + phase alignment)
+        V_tracked = [evecs[0]]
+        for k in range(1, evecs.shape[0]):
+            V_prev, V_cur = V_tracked[-1], evecs[k]
+            O = xp.abs(xp.swapaxes(xp.conj(V_prev), -1, -2) @ V_cur)  # (N,N)
+            order, used = [], set()
+            for i in range(N):
+                j = int(xp.argmax(O[i, :]).item())
+                while j in used:
+                    O[i, j] = -1.0
+                    j = int(xp.argmax(O[i, :]).item())
+                order.append(j);
+                used.add(j)
+            Vc = V_cur[:, order]
+            for j in range(N):
+                phase = xp.angle(xp.einsum("i,i->", xp.conj(V_prev[:, j]), Vc[:, j]))
+                Vc[:, j] *= xp.exp(-1j * phase)
+            V_tracked.append(Vc)
+        V_tracked = xp.stack(V_tracked, axis=0)  # (n,N,N)
+
+        # Production flavor decomposition in matter basis (weights conserved adiabatically)
+        e_alpha = xp.zeros((N,), dtype=self.backend.dtype_complex);
+        e_alpha[alpha] = 1.0
+        c0 = xp.swapaxes(xp.conj(V_tracked[0]), -1, -2) @ e_alpha
+        w = xp.abs(c0) ** 2  # (N,)
+
+        # Overlap with vacuum mass eigenvectors; phase-averaged fractions
+        M = xp.abs(xp.swapaxes(xp.conj(U), -1, -2) @ V_tracked) ** 2  # (n,N,N)
+        F = M @ w  # (n,N)
+
+        if rev:
+            F = F[::-1, :]  # restore original r_km ordering
+
+        return F
