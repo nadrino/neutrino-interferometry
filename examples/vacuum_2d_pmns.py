@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import os
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from nu_waves.models.mixing import Mixing
@@ -73,6 +74,6 @@ plot_oscillogram(axes[1], E_vals, L_vals, P_mumu, r"$P(\nu_\mu\to\nu_\mu)$")
 
 
 # plt.savefig("../figures/vacuum_2d_pmns.pdf") # too heavy
-plt.savefig("../figures/vacuum_2d_pmns.jpg", dpi=150)
+plt.savefig("../figures/vacuum_2d_pmns.jpg", dpi=150) if not os.environ.get("CI") else None
 plt.show()
 

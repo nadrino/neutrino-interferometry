@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
@@ -86,6 +87,6 @@ plt.ylim(0, 0.3)
 plt.legend(ncol=2, frameon=False)
 plt.tight_layout()
 
-plt.savefig("../figures/matter_constant_test.jpg", dpi=150)
+plt.savefig("../figures/matter_constant_test.jpg", dpi=150)  if not os.environ.get("CI") else None
 plt.show()
 

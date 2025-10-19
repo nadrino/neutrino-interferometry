@@ -82,5 +82,5 @@ plt.grid(True, which="both", alpha=0.3)
 plt.legend(frameon=False)
 plt.tight_layout()
 
-plt.savefig("../figures/adiabatic_sun_ssm_test.jpg", dpi=150)
+plt.savefig("../figures/adiabatic_sun_ssm_test.jpg", dpi=150) if not os.environ.get("CI") else None
 plt.show()
