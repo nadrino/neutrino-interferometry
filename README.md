@@ -9,6 +9,9 @@ You can input your own parameters and get the oscillation probabilities.
 
 ## How to install?
 
+```bash
+pip install nu-waves
+```
 
 
 ## Features

@@ -193,7 +193,14 @@ class _TorchLinalg:
 
 def make_torch_mps_backend(seed=0, use_complex64=True):
     torch.manual_seed(seed)
-    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+    elif torch.backends.cudnn.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
     dtype_real    = torch.float32 if use_complex64 else torch.float64
     dtype_complex = torch.complex64 if use_complex64 else torch.complex128
 

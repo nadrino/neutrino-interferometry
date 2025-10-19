@@ -1,26 +1,53 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
 
 [project]
-name = "nu_waves"
-version = "0.1.0"
-description = "Python library for calculating flavour oscillation probability of neutrinos"
-authors = [
-  { name="Nadrino", email="adrien.blanchet@cern.ch" }
-]
-license = { text = "GNU LESSER GENERAL PUBLIC LICENSE v2.1" }
+name = "nu-waves"
+version = "1.0.0"  # keep in sync with src/nu_waves/version.py unless you switch to dynamic
+description = "Flavour-oscillation probabilities for neutrinos with numpy/torch backends."
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-  "numpy",
-  "tensorflow-macos; platform_system=='Darwin'",
-  "tensorflow-metal; platform_system=='Darwin'",
-  "matplotlib",
-#  "torch; version>=2.2"
+requires-python = ">=3.9"
+license = { text = "LGPL-2.1-or-later" }
+authors = [{ name = "Nadrino" }]
+keywords = ["neutrino", "oscillations", "physics", "PMNS"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Typing :: Typed",
 ]
+dependencies = [
+  "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+torch = ["torch>=2.0; platform_machine!='wasm32'"]  # optional backend
+cupy = ["cupy>=12; platform_system=='Linux'"]       # optional backend
+plot = ["matplotlib>=3.7"]
+dev = [
+  "pytest>=7",
+  "pytest-cov",
+  "ruff",
+  "mypy",
+  "build",
+  "twine",
+]
+dev = ["pytest", "numpy", "torch"]
+
 
 [project.urls]
-Homepage = "https://github.com/nadrino/neutrino_interferometry"
-Repository = "https://github.com/nadrino/neutrino_interferometry"
+Homepage = "https://github.com/nadrino/neutrino-interferometry"
+Issues   = "https://github.com/nadrino/neutrino-interferometry/issues"
 
+[tool.hatch.build.targets.sdist]
+include = ["src/nu_waves", "README.md", "LICENSE"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nu_waves"]
