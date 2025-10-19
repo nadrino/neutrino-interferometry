@@ -196,7 +196,7 @@ def make_torch_mps_backend(seed=0, use_complex64=True):
 
     if torch.backends.mps.is_available():
         device = torch.device("mps")
-    elif torch.backends.cudnn.is_available():
+    elif torch.cuda.is_available():
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
