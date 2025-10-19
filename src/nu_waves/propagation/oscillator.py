@@ -181,8 +181,7 @@ class VacuumOscillator:
         else:
             # Torch path uses index_select (advanced indexing parity)
             import torch
-            to_idx = lambda x: x if isinstance(x, torch.Tensor) else torch.as_tensor(x, dtype=torch.long,
-                                                                                     device=self.backend.xp.device)
+            to_idx = lambda x: xp.asarray(x, int)
             if a_scalar and b_scalar:
                 return self.backend.from_device(P[..., int(b), int(a)])
             if a_scalar and not b_scalar:

@@ -5,11 +5,17 @@ import numpy as np
 def _map_dtype_torch(requested, dtype_real, dtype_complex):
     if requested is None:
         return dtype_real
-    # accept Python/numpy type hints used in the codebase
+    # ---- integers (FIX) ----
+    if requested in (int, np.int64, torch.int64):
+        return torch.int64
+    if requested in (np.int32, torch.int32):
+        return torch.int32
+    # ---- floats ----
     if requested in (float, np.float32, torch.float32):
         return torch.float32
     if requested in (np.float64, torch.float64):
         return torch.float64
+    # ---- complex ----
     if requested in (complex, np.complex64, torch.complex64):
         return torch.complex64
     if requested in (np.complex128, torch.complex128):
