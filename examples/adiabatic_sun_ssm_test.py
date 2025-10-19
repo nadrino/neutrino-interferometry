@@ -10,6 +10,7 @@ from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import VacuumOscillator
 from nu_waves.matter.solar import load_bs05_agsop  # you added this in solar.py
+import nu_waves.utils.style
 
 # toggle for CPU/GPU
 # torch_backend = None

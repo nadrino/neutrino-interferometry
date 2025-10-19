@@ -5,6 +5,7 @@ from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import VacuumOscillator
 from nu_waves.backends import make_torch_mps_backend
 import nu_waves.utils.flavors as flavors
+import nu_waves.utils.style
 
 # toggle GPU
 torch_backend = None

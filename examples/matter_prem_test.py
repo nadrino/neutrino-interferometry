@@ -8,6 +8,7 @@ from nu_waves.propagation.oscillator import VacuumOscillator
 from nu_waves.matter.prem import PREMModel
 from nu_waves.matter.profile import MatterProfile
 from nu_waves.backends import make_torch_mps_backend
+import nu_waves.utils.style
 
 # toggle for CPU/GPU
 # torch_backend = None
@@ -17,17 +18,6 @@ torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
 # SCHEME = "prem_layers"      # exact PREM shells
 SCHEME = "hist_density"   # fine histogram of density along path
 
-
-plt.rcParams.update({
-    "font.size": 16,
-    "axes.titlesize": 18,
-    "axes.labelsize": 16,
-    "xtick.labelsize": 13,
-    "ytick.labelsize": 13,
-    "legend.fontsize": 13,
-    "mathtext.fontset": "cm",
-    "font.family": "serif"
-})
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}

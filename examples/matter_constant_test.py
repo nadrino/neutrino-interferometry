@@ -4,7 +4,7 @@ from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import VacuumOscillator
 import nu_waves.utils.flavors as flavors
-
+import nu_waves.utils.style
 
 
 # 3 flavors PMNS, PDG values (2025)
