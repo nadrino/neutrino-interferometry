@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.profile import MatterProfile
 import nu_waves.utils.flavors as flavors
 
@@ -17,7 +17,7 @@ spec = Spectrum(n=3, m_lightest=0.)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
 # oscillator
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 
 osc.use_vacuum()
 P_vac = osc.probability(L_km=295, E_GeV=np.linspace(0.3,3,200), alpha=1, beta=0)
@@ -65,7 +65,7 @@ print("One-layer profile reproduces constant-density result")
 try:
     from nu_waves.backends import make_torch_mps_backend
     torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
-    osc_mps = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
+    osc_mps = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
     profile = MatterProfile.from_fractions([rho], [Ye], [1.0])
     osc_mps.set_layered_profile(profile)
     P_mps_np = osc_mps.probability(L_km=L_km, E_GeV=E, alpha=None, beta=None)

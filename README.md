@@ -40,12 +40,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.propagation.oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 
 # sterile test
-osc_amplitude = 0.1 # sin^2(2\theta)
-angles = {(1, 2): np.arcsin(np.sqrt(osc_amplitude))/2}
+osc_amplitude = 0.1  # sin^2(2\theta)
+angles = {(1, 2): np.arcsin(np.sqrt(osc_amplitude)) / 2}
 pmns = Mixing(dim=2, mixing_angles=angles)
 U_pmns = pmns.get_mixing_matrix()
 print(np.round(U_pmns, 3))
@@ -57,7 +57,7 @@ spec.summary()
 m2_diag = np.diag(spec.get_m2())
 
 # oscillator object that calculates the oscillation probability
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 
 # get the oscillation probabilities
 E_fixed = 3E-3
@@ -67,19 +67,19 @@ print(L_list)
 P = osc.probability(
     L_km=L_list, E_GeV=E_fixed,
     alpha=flavors.electron,
-    beta=flavors.electron, # muon could be sterile
+    beta=flavors.electron,  # muon could be sterile
     antineutrino=True
 )
 
 # draw it
 plt.figure(figsize=(6.5, 4.0))
 
-plt.plot(L_list*1000, P, label=r"$P_{e e}$ disappearance", lw=2)
-plt.plot(L_list*1000, [1]*len(L_list), "--", label="Total probability", lw=1.5)
+plt.plot(L_list * 1000, P, label=r"$P_{e e}$ disappearance", lw=2)
+plt.plot(L_list * 1000, [1] * len(L_list), "--", label="Total probability", lw=1.5)
 
 plt.xlabel(r"$L_\nu$ [m]")
 plt.ylabel(r"Probability")
-plt.title(f"eV$^2$ sterile with $E_\\nu$ = {E_fixed*1000} MeV")
+plt.title(f"eV$^2$ sterile with $E_\\nu$ = {E_fixed * 1000} MeV")
 # plt.xlim(L_min, L_max)
 plt.ylim(0, 1.05)
 plt.legend()

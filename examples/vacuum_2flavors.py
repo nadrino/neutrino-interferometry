@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.backends import make_torch_mps_backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
@@ -30,7 +30,7 @@ spec.summary()
 m2_diag = np.diag(spec.get_m2())
 
 
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
+osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
 
 E_fixed = 3E-3
 L_min, L_max = 1e-3, 20e-3

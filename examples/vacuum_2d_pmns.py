@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.backends import make_torch_mps_backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
@@ -24,7 +24,7 @@ spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
 
 # oscillator
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
+osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
 
 # --- Grid definition (x: energy, y: baseline) ---
 E_vals = np.linspace(0.2, 5.0, 1000)     # GeV  (x-axis)

@@ -2,7 +2,7 @@ import numpy as np
 
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.profile import MatterProfile
 from nu_waves.backends import make_numpy_backend
 
@@ -30,7 +30,7 @@ def run_once(backend_name="numpy"):
         backend = make_torch_mps_backend(seed=0, use_complex64=True)
 
     # Build oscillator
-    osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=backend)
+    osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=backend)
 
     # Two-layer toy profile (mantle 70%, core 30%) — just to exercise layered propagation
     rho = [2.8, 11.0]    # g/cm^3
@@ -71,8 +71,8 @@ if __name__ == "__main__":
     print(f"Computing with Torch backend on device: {dev}")
 
     # Reuse the same function but force torch backend inside
-    osc_mps = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(),
-                               backend=torch_backend)
+    osc_mps = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(),
+                         backend=torch_backend)
 
     # same profile
     from nu_waves.matter.profile import MatterProfile

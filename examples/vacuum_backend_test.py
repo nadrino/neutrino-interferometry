@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.propagation.oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 
 # 3 flavors PMNS, PDG values (2025)
@@ -17,7 +17,7 @@ spec = Spectrum(n=3, m_lightest=0.)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 spec.summary()
 
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 
 print("Testing shape of VacuumOscillator.probability")
 assert osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,5)).shape == (5,3,3)
@@ -49,12 +49,12 @@ torch_backend = make_torch_mps_backend(seed=123, use_complex64=True)  # MPS if a
 
 # CPU/NumPy
 print("Computing with NumPy")
-osc_np = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+osc_np = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 P_np = osc_np.probability(L_km=295, E_GeV=np.linspace(0.2,2.0,200), alpha=1, beta=1)
 
 # MPS
 print("Computing with MPS")
-osc_mps = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=make_torch_mps_backend(seed=0))
+osc_mps = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=make_torch_mps_backend(seed=0))
 P_mps = osc_mps.probability(L_km=295, E_GeV=np.linspace(0.2,2.0,200), alpha=1, beta=1)
 
 # 1) Check dtype/device of the key tensors on MPS

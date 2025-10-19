@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from nu_waves.backends import make_torch_mps_backend
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.solar import load_bs05_agsop  # you added this in solar.py
 import nu_waves.utils.style
 
@@ -38,7 +38,7 @@ phases = {(1, 3): np.deg2rad(195)}
 spec = Spectrum(n=3, m_lightest=0.)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
-osc = VacuumOscillator(
+osc = Oscillator(
     mixing_matrix=Mixing(dim=3, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix(),
     m2_list=spec.get_m2(),
     backend=torch_backend

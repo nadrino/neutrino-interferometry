@@ -5,7 +5,7 @@ from nu_waves.matter.profile import MatterProfile
 from nu_waves.utils.units import KM_TO_EVINV
 
 
-class VacuumOscillator:
+class Oscillator:
     """
     Compute oscillation probabilities in vacuum for arbitrary (L, E) pairs or grids.
 

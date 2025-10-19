@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import VacuumOscillator
+from nu_waves.propagation.oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
@@ -18,7 +18,7 @@ spec = Spectrum(n=3, m_lightest=0.)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 spec.summary()
 
-osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 
 # Compute probabilities:
 # α = 1 (νμ source), β = [1,2,3] → (νμ, νe, ντ)
