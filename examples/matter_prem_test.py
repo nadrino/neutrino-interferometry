@@ -6,6 +6,7 @@ from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import VacuumOscillator
 from nu_waves.matter.prem import PREMModel
+from nu_waves.matter.profile import MatterProfile
 from nu_waves.backends import make_torch_mps_backend
 
 # toggle for CPU/GPU
@@ -22,8 +23,28 @@ U_pmns = pmns.get_mixing_matrix()
 spec = Spectrum(n=3, m_lightest=0.)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
-
 osc = VacuumOscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
+
+# sanity test for layer ordering
+prof = MatterProfile.from_segments(
+    rho_gcm3=[2.8, 11.0], Ye=[0.5, 0.467], lengths_km=[3000.0, 2000.0]
+)
+osc.set_layered_profile(prof)
+E = np.linspace(2,8,200)
+P_fwd = osc.probability(L_km=sum(l.weight for l in prof.layers), E_GeV=E, alpha=1, beta=0)
+
+# reverse the profile
+prof_rev = MatterProfile.from_segments(
+    rho_gcm3=[11.0, 2.8], Ye=[0.467, 0.5], lengths_km=[2000.0, 3000.0]
+)
+osc.set_layered_profile(prof_rev)
+P_rev = osc.probability(L_km=sum(l.weight for l in prof_rev.layers), E_GeV=E, alpha=1, beta=0)
+
+if torch_backend:
+    P_rev = torch_backend.from_device(P_rev)
+    P_fwd = torch_backend.from_device(P_fwd)
+
+print("max |ΔP| (fwd vs rev) =", np.max(np.abs(P_fwd - P_rev)))  # should be >> 1e-3
 
 L = 8000.0
 E = np.linspace(1, 10, 400)
@@ -64,18 +85,23 @@ for iy, cz in enumerate(cosz):
 
 
 def draw(ax, X, Y, Z, title):
-    im = ax.imshow(Z, origin="lower", aspect="auto",
-                   extent=[X.min(), X.max(), Y.min(), Y.max()],
-                   vmin=0.0, vmax=1.0, interpolation="nearest", cmap='inferno')
+    # im = ax.imshow(Z, origin="lower", aspect="auto",
+    #                extent=[X.min(), X.max(), Y.min(), Y.max()],
+    #                vmin=0.0, vmax=1.0, interpolation="nearest", cmap='inferno')
     E_edges = np.geomspace(0.1, 100.0, len(E_GeV) + 1)
     E_centers = np.sqrt(E_edges[:-1] * E_edges[1:])  # compute P on centers
     CZ_edges = np.linspace(-1.0, 1.0, len(cosz) + 1)
-    pc = ax.pcolormesh(E_edges, CZ_edges, Z, vmin=0, vmax=1, shading="auto")
+    pc = ax.pcolormesh(
+        E_edges, CZ_edges, Z,
+        vmin=0, vmax=1,
+        cmap="inferno",
+        shading="auto",
+    )
     ax.set_xscale('log')
     ax.set_xlabel(r"$E_\nu$ [GeV]")
     ax.set_ylabel(r"$\cos\theta_z$")
     ax.set_title(title)
-    cbar = plt.colorbar(im, ax=ax, pad=0.01)
+    cbar = plt.colorbar(pc, ax=ax, pad=0.01)
     cbar.set_label("Probability")
 
 fig, axs = plt.subplots(1, 2, figsize=(11, 4.2), constrained_layout=True)
