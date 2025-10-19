@@ -7,6 +7,20 @@ that calculate flavor oscillation of neutrinos.
 You can input your own parameters and get the oscillation probabilities.
 
 
+## Features
+
+- Oscillation framework with `N` neutrinos
+- Vacuum oscillations
+- Constant matter MSW
+- Multi-layer matter MSW
+- Earth model (PREM) with `cosz`
+- Adiabatic transitions
+
+## Pictures
+
+[matter_prem_test.pdf](figures/matter_prem_test.pdf)
+
+
 ## Examples
 
 ### 2 flavors oscillation in vacuum
