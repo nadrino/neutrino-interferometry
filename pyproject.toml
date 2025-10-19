@@ -38,8 +38,9 @@ dev = [
   "mypy",
   "build",
   "twine",
+  "numpy",
+  "torch",
 ]
-dev = ["pytest", "numpy", "torch"]
 
 
 [project.urls]
