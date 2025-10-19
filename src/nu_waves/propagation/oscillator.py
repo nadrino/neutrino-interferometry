@@ -26,15 +26,32 @@ class Oscillator:
                  backend=None
                  ):
         self.backend = backend or make_numpy_backend()
-        self.hamiltonian = Hamiltonian(
-            mixing_matrix, m2_list,
-            backend=self.backend
-        )
+
+        self.mixing_matrix = mixing_matrix
+        self.m2_list = m2_list
+        self.hamiltonian = None
+        self.set_parameters(mixing_matrix=mixing_matrix, m2_list=m2_list)
 
         # samplers: callable(center_array, n_samples)
         self.energy_sampler = energy_sampler
         self.baseline_sampler = baseline_sampler
         self.n_samples = n_samples
+
+    def set_parameters(self, mixing_matrix: np.ndarray =None, m2_list: np.ndarray =None):
+        if mixing_matrix is None and m2_list is None:
+            raise ValueError("Must specify either mixing_matrix or m2_list")
+
+        if mixing_matrix is not None:
+            self.mixing_matrix = mixing_matrix
+        if m2_list is not None:
+            self.m2_list = m2_list
+
+        # rebuild hamiltonian
+        self.hamiltonian = Hamiltonian(
+            self.mixing_matrix, self.m2_list,
+            backend=self.backend
+        )
+
 
     def set_constant_density(self, rho_gcm3: float, Ye: float = 0.5):
         self._use_matter = True

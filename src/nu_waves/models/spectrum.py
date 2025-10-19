@@ -19,11 +19,14 @@ class Spectrum:
         Antisymmetric matrix of Δm²_ij = m_i² − m_j²
     """
 
-    def __init__(self, n: int, m_lightest: float = 0.0):
+    def __init__(self, n: int, m_lightest: float = 0.0, dm2: dict = None):
         if n < 2:
             raise ValueError("Number of mass states must be ≥ 2.")
         self.m_lightest = float(m_lightest)
         self.dm2_matrix = np.zeros((n, n), dtype=float)
+
+        if dm2 is not None:
+            self.set_dm2(dm2)
 
     @property
     def n(self):
