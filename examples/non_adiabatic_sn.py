@@ -1,19 +1,15 @@
-# examples/non_adiabatic_supernova.py
 import numpy as np
 import matplotlib.pyplot as plt
 
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.matter.supernova import CoreCollapseSN
-# If you already integrated the patched function:
-# from nu_waves.matter.msw import landau_zener_for_pair
 
-# ---------- PMNS + spectrum ----------
-# PDG-ish NH params
+# ---- PMNS / spectrum (NH) ----
 theta12 = np.deg2rad(33.44)
 theta13 = np.deg2rad(8.57)
 dm21 = 7.42e-5     # eV^2
-dm31 = 2.517e-3    # eV^2 (NH)
+dm31 = 2.517e-3    # eV^2
 E_MeV = 10.0
 
 angles = {(1, 2): theta12, (1, 3): theta13, (2, 3): 0.0}
@@ -24,64 +20,117 @@ spec = Spectrum(n=3, m_lightest=0.0)
 spec.set_dm2({(2, 1): dm21, (3, 1): dm31})
 m2 = spec.get_m2()
 
-# ---------- SN profile ----------
-# Narrow shock → sizable non-adiabatic H resonance
-sn = CoreCollapseSN(shock_radius_km=7000.0, shock_width_km=8.0, shock_drop=0.2, Ye=0.5)
+# ---- 1) Locate the H-resonance on a smooth profile (no shock) ----
+base = CoreCollapseSN(shock_drop=1.0)  # S(r)=1 everywhere
+rH0 = base.resonance_radius_H(dm31, theta13, E_MeV)
+rL0 = base.resonance_radius_L(dm21, theta12, theta13, E_MeV)
 
-# radius grid for plotting eigenvalues
-r = np.geomspace(30.0, 1.5e5, 1400)  # km
-Ve = sn.Ve(r)
-
-# ---------- build H(r) and diagonalize (for visuals) ----------
+# --- DIAGNOSTICS ---
 E_eV = 1e6 * E_MeV
-H_vac = U @ np.diag(m2 / (2.0 * E_eV)) @ np.conjugate(U.T)  # eV
-H_list = np.zeros((r.size, 3, 3), dtype=np.complex128)
-H_list[:] = H_vac[np.newaxis, :, :]
-for k, v in enumerate(Ve):
-    H_list[k, 0, 0] += v  # charged-current potential diag(Ve, 0, 0)
+target_H = (dm31 * np.cos(2*theta13)) / (2.0 * E_eV)
+target_L = (dm21 * np.cos(2*theta12)) / (2.0 * E_eV) / (np.cos(theta13)**2)
 
-evals = np.linalg.eigvalsh(H_list)  # (n,3), sorted ascending
+rH_base = base.resonance_radius_H(dm31, theta13, E_MeV)
+rL_base = base.resonance_radius_L(dm21, theta12, theta13, E_MeV)
 
-# ---------- Landau–Zener jump probability at H ----------
-Pc_H, rH = sn.parke_Pc('H', E_MeV, dm21, dm31, theta12, theta13)
-Pc_L, rL = sn.parke_Pc('L', E_MeV, dm21, dm31, theta12, theta13)  # should be ~0 here
+print("\n--- Baseline (no shock) ---")
+print(f"target_H = {target_H:.3e} eV, target_L = {target_L:.3e} eV")
+print(f"rH_base = {rH_base:.1f} km, rL_base = {rL_base:.1f} km")
+print(f"Ve(rH_base) = {base.Ve(rH_base):.3e} eV   (should ≈ target_H)")
+print(f"dlnNe/dr(rH_base) = {base.dlnNe_dr(rH_base):.3e} 1/km")
 
-# ---------- mass-state fractions along r (NH, ν_e at production) ----------
-def smooth_step(x, x0, frac_width=0.02):
-    if x0 is None: return np.zeros_like(x)
-    w = frac_width * x0
-    return 0.5 * (1 + np.tanh((x - x0) / w))
+# Try your current non-adiabatic profile (sn_na) AFTER you construct it
+def dump_profile(sn, label):
+    rH = sn.resonance_radius_H(dm31, theta13, E_MeV)
+    print(f"\n--- {label} ---")
+    print(f"shock @ {sn.rs:.1f} km, width={sn.dw:.1f} km, drop f={sn.f}")
+    print(f"rH = {rH} km")
+    if rH:
+        print(f"   Ve(rH) = {sn.Ve(rH):.3e} eV (target_H={target_H:.3e} eV)")
+        print(f"   dlnNe/dr(rH) = {sn.dlnNe_dr(rH):.3e} 1/km")
+        pref = (dm31/(2.0*E_eV)) * (np.sin(2*theta13)**2/np.cos(2*theta13))
+        gamma = pref * 5.0677307e9 / abs(sn.dlnNe_dr(rH))
+        Pc = np.exp(-0.5*np.pi*gamma)
+        print(f"   pref={pref:.3e} eV, gamma={gamma:.3e} -> Pc_H≈{Pc:.3f}")
 
-S_H = smooth_step(r, rH)
-S_L = smooth_step(r, rL)  # small effect
 
-# Adiabatic: P_H=0 → ν3 outside
-p3_ad = 1.0 - 0.0 * S_H
-p2_ad = 0.0 * S_H * (1.0 - 0.0) + 0.0 * S_L * (1.0 - S_H)
-p1_ad = 1.0 - p2_ad - p3_ad
+# ---- 2) Build two profiles with the shock centered at r_H ----
+# Broad shock → almost adiabatic; Narrow shock → non-adiabatic
+# sn_ad = CoreCollapseSN(shock_radius_km=rH0, shock_width_km=1500.0, shock_drop=0.6, Ye=0.5)
+# sn_na = CoreCollapseSN(shock_radius_km=rH0, shock_width_km=8.0,    shock_drop=0.2, Ye=0.5)
 
-# Non-adiabatic: P_H = Pc_H
-p3_na = 1.0 - Pc_H * S_H
-p2_na = Pc_H * S_H * (1.0 - Pc_L) + Pc_L * S_L * (1.0 - S_H)
-p1_na = 1.0 - p2_na - p3_na
+# factor at the shock *center* for the tanh model
+f_ad, f_na = 0.6, 0.2      # broad/adiabatic, sharp/non-adiabatic drops
+center_fac_ad = 0.5*(1.0 + f_ad)
+center_fac_na = 0.5*(1.0 + f_na)
 
-# ---------- plots ----------
+# choose rs so that the *center* of the shock is at the H resonance
+rs_ad = base._find_root_on_grid(target_H / center_fac_ad)
+rs_na = base._find_root_on_grid(target_H / center_fac_na)
+
+sn_ad = CoreCollapseSN(shock_radius_km=rs_ad, shock_width_km=1500.0, shock_drop=f_ad, Ye=0.5)
+sn_na = CoreCollapseSN(shock_radius_km=rs_na, shock_width_km=6.0,    shock_drop=f_na, Ye=0.5)
+
+dump_profile(sn_ad, "sn_ad")
+dump_profile(sn_na, "sn_na")
+
+
+# ---- helper: compute Pc at H/L and mass-state fractions along radius ----
+def mass_state_path(sn: CoreCollapseSN, E_MeV: float, use_lz: bool,
+                    rmin=30.0, rmax=1.5e5, n=1400):
+    r = np.geomspace(rmin, rmax, n)
+
+    # Landau–Zener jump probabilities from the profile
+    PcH, rH = sn.parke_Pc('H', E_MeV, dm21, dm31, theta12, theta13)
+    PcL, rL = sn.parke_Pc('L', E_MeV, dm21, dm31, theta12, theta13)
+
+    PcH_used = PcH if use_lz else 0.0
+    PcL_used = PcL if use_lz else 0.0
+
+    # smooth steps to visualize where the swaps occur
+    def step(arr, r0, frac_width=0.02):
+        if r0 is None: return np.zeros_like(arr)
+        w = frac_width * r0
+        return 0.5 * (1 + np.tanh((arr - r0) / w))
+
+    SH = step(r, rH); SL = step(r, rL)
+
+    # NH, ν_e at production: at surface → ν3 if adiabatic at H
+    p3 = 1.0 - PcH_used * SH
+    p2 = PcH_used * SH * (1.0 - PcL_used) + PcL_used * SL * (1.0 - SH)
+    p1 = 1.0 - p2 - p3
+
+    return r, (p1, p2, p3), dict(PcH=PcH, rH=rH, PcL=PcL, rL=rL)
+
+# ---- 3) Evaluate & plot ----
+rA, (p1A, p2A, p3A), infoA = mass_state_path(sn_ad, E_MeV, use_lz=False)
+rN, (p1N, p2N, p3N), infoN = mass_state_path(sn_na, E_MeV, use_lz=True)
+
+print(f"[Adiabatic-like]  Pc_H={infoA['PcH']:.3e} at r_H={infoA['rH']:.0f} km, "
+      f"Pc_L={infoA['PcL']:.3e} at r_L={infoA['rL']:.0f} km")
+print(f"[Non-adiabatic ]  Pc_H={infoN['PcH']:.3f} at r_H={infoN['rH']:.0f} km, "
+      f"Pc_L={infoN['PcL']:.3e} at r_L={infoN['rL']:.0f} km")
+
 fig, ax = plt.subplots(1, 2, figsize=(12, 4), sharey=True)
 
-def panel(ax, p1, p2, p3, title):
+def panel(ax, r, p1, p2, p3, title, rH, rL):
     ax.plot(r, p1, label=r'$\nu_1$')
     ax.plot(r, p2, label=r'$\nu_2$')
     ax.plot(r, p3, label=r'$\nu_3$')
-    for rr, txt in [(rH, 'H'), (rL, 'L')]:
+    for rr, lbl in [(rH, 'H'), (rL, 'L')]:
         if rr is not None:
-            ax.axvline(rr, ls='--', color='k', alpha=0.6)
-            ax.text(rr*1.02, 0.05, txt, rotation=90, va='bottom', ha='left')
-    ax.set_xscale('log'); ax.set_xlim(r[0], r[-1]); ax.set_ylim(0, 1.0)
+            ax.axvline(rr, ls='--', lw=1, color='k', alpha=0.6)
+            ax.text(rr*1.02, 0.05, lbl, rotation=90, va='bottom', ha='left', fontsize=9)
+    ax.set_xscale('log'); ax.set_xlim(r[0], r[-1])
+    ax.set_ylim(-0.02, 1.02)  # avoid hiding p3≈1 on the top frame
     ax.set_xlabel('r [km]'); ax.set_title(title); ax.grid(True, which='both', alpha=0.25)
 
-panel(ax[0], p1_ad, p2_ad, p3_ad, f'Adiabatic (E={E_MeV:.0f} MeV)\n$P_H=0$')
-panel(ax[1], p1_na, p2_na, p3_na, f'Non-adiabatic with shock (E={E_MeV:.0f} MeV)\n$P_H={Pc_H:.2f}$')
-ax[0].set_ylabel('Mass-state fraction'); ax[1].legend(loc='lower right', frameon=False)
-plt.tight_layout(); plt.show()
+panel(ax[0], rA, p1A, p2A, p3A,
+      f'Adiabatic (E={E_MeV:.0f} MeV)\n$P_H=0$', infoA['rH'], infoA['rL'])
+panel(ax[1], rN, p1N, p2N, p3N,
+      f'Non-adiabatic with shock (E={E_MeV:.0f} MeV)\n$P_H={infoN["PcH"]:.2f}$',
+      infoN['rH'], infoN['rL'])
 
-print(f"H-resonance: Pc_H = {Pc_H:.3f} at r_H ≈ {rH:.0f} km; L-resonance: Pc_L = {Pc_L:.2e}")
+ax[0].set_ylabel('Mass-state fraction')
+ax[1].legend(loc='lower right', frameon=False)
+plt.tight_layout(); plt.show()
