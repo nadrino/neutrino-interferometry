@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import numpy as np
 
+from nu_waves.utils.units import GF
+
 
 @dataclass
 class SolarProfile:
@@ -95,3 +97,25 @@ def load_bs05_agsop(path: str, R_sun_km: float = 695_700.0) -> SolarProfileSSM:
         Ye_tab=Ye[order],
     )
 
+
+def matter_potential_from_Ne(Ne_per_cm3: np.ndarray) -> np.ndarray:
+    """
+    V_e = sqrt(2) * G_F * N_e
+    Units: if Ne in 1/cm^3 and G_F in MeV^-2, this returns V in MeV.
+    Make sure this matches your existing unit conventions elsewhere.
+    """
+    # Convert Ne [/cm^3] to [/MeV^3] if you use natural units; otherwise keep coherent with your Hamiltonian.
+    # Placeholder: return in "MeV" units consistent with your H.
+    return np.sqrt(2.0) * GF * Ne_per_cm3  # adjust if needed
+
+
+def resonance_Ne_12(Delta_m2_21_eV2: float, theta12_rad: float, E_MeV: np.ndarray) -> np.ndarray:
+    """
+    N_e(res) = (Delta m^2 cos2θ) / (2 sqrt(2) G_F E)
+    Returns electron density at resonance (unit consistent with matter_potential_from_Ne).
+    """
+    cos2 = np.cos(2*theta12_rad)
+    # Convert Δm² [eV²] and E [MeV] coherently to your unit system.
+    # If your Hamiltonian uses eV, include appropriate conversion factors.
+    # Here we return 'effective Ne' in the same units used in matter_potential_from_Ne.
+    return (Delta_m2_21_eV2 * cos2) / (2.0 * np.sqrt(2.0) * GF * E_MeV)
