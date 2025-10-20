@@ -9,7 +9,7 @@ from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.solar import load_bs05_agsop
-from nu_waves.matter.msw import landau_zener_for_pair
+from nu_waves.matter.landau import landau_zener_for_pair
 from nu_waves.backends import make_torch_mps_backend
 import nu_waves.utils.style
 
@@ -43,7 +43,7 @@ osc = Oscillator(
 )
 
 # ---- physics knobs ----
-E_GeV  = 0.01      # 2 MeV
+E_GeV  = 0.003      # 2 MeV
 r_emit = 0.05 * sol.R_sun_km
 
 # distances from emission to surface; include 0 for initial marker
@@ -93,6 +93,7 @@ if lz["has_cross"]:
              va="bottom", ha="left", fontsize=10, alpha=0.8)
 
 plt.xscale("log")
+plt.title(f"Neutrino emitted in sun (r/$R_s$={r_emit/sol.R_sun_km}) with energy E={E_GeV*1000:.2g} MeV")
 plt.xlabel(r"$r/R_\odot$")
 plt.ylabel("Mass–state fraction (adiabatic)")
 plt.ylim(0, 1.0)

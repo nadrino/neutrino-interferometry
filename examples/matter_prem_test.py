@@ -56,9 +56,19 @@ P_IO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0, antineutrino=True)  # �
 
 print("P_mu->e max (NO, ν):", P_NO.max(), "  P_mu->e max (IO, ν̄):", P_IO.max())
 
-E_GeV = np.logspace(-1, 2, 480)     # x
-cosz  = np.linspace(-1.0, 1.0, 240)     # y (upgoing)
+E_GeV = np.logspace(-1, 2, 400)     # x
+cosz  = np.linspace(-1.0, 1.0, 200)     # y (upgoing)
 prem  = PREMModel()
+
+xp = osc.backend.xp
+def e_smear(E_center, n, a=0.01):
+    E = xp.asarray(E_center, dtype=float)
+    sigma = a * E
+    out = xp.normal(loc=E[..., None], scale=sigma[..., None], size=E.shape + (n,))
+    return out
+
+osc.energy_sampler = e_smear
+osc.n_samples = 50
 
 # test for thickness
 prof = prem.profile_from_coszen(+0.3, h_atm_km=15.0)

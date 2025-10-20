@@ -45,7 +45,7 @@ osc = Oscillator(
 )
 
 # 4) Physics knobs
-E_GeV   = 0.010                      # 10 MeV
+E_GeV   = 0.003                      # 10 MeV
 r_emit  = 0.05 * sol.R_sun_km        # emission radius
 # distances from emission to the surface; include 0 for marker
 s_max   = sol.R_sun_km - r_emit
