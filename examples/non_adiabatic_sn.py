@@ -68,8 +68,35 @@ center_fac_na = 0.5*(1.0 + f_na)
 rs_ad = base._find_root_on_grid(target_H / center_fac_ad)
 rs_na = base._find_root_on_grid(target_H / center_fac_na)
 
+def tune_shock_for_target_Pc(base_profile, target_Pc, dm31, theta13, E_MeV, f=0.2, n=3.0):
+    """Return (rs, width_km) so that Pc_H ≈ target_Pc at the shock center."""
+    # 1) place the *center* of the shock on resonance
+    E = 1e6 * E_MeV
+    target_H = (dm31 * np.cos(2*theta13)) / (2.0 * E)
+    center_fac = 0.5 * (1.0 + f)
+    rs = base_profile._find_root_on_grid(target_H / center_fac)
+
+    # 2) compute the slope required for the given Pc
+    pref = (dm31/(2.0*E)) * (np.sin(2*theta13)**2/np.cos(2*theta13))
+    gamma = max(1e-6, -2.0*np.log(max(1e-12, target_Pc))/np.pi)
+    slope_target = (pref * 5.0677307e9) / gamma  # [1/km]
+
+    # 3) infer the needed shock width (clip to avoid negatives)
+    base_slope = -n / rs
+    shock_term = max(1e-6, slope_target - base_slope)
+    width_km = (1.0 - f) / ((1.0 + f) * shock_term)
+    return float(rs), float(width_km)
+
 sn_ad = CoreCollapseSN(shock_radius_km=rs_ad, shock_width_km=1500.0, shock_drop=f_ad, Ye=0.5)
-sn_na = CoreCollapseSN(shock_radius_km=rs_na, shock_width_km=6.0,    shock_drop=f_na, Ye=0.5)
+sn_na = CoreCollapseSN(shock_radius_km=rs_na, shock_width_km=3.0,    shock_drop=f_na, Ye=0.5)
+
+# Smooth base to locate resonance
+# base = CoreCollapseSN(shock_drop=1.0)
+# # Aim for, say, PH≈0.4
+# rs, width = tune_shock_for_target_Pc(base, target_Pc=0.4,
+#                                      dm31=dm31, theta13=theta13, E_MeV=E_MeV,
+#                                      f=0.2, n=3.0)
+# sn_na = CoreCollapseSN(shock_radius_km=rs, shock_width_km=width, shock_drop=0.2, Ye=0.5)
 
 dump_profile(sn_ad, "sn_ad")
 dump_profile(sn_na, "sn_na")
