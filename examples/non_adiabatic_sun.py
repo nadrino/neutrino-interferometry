@@ -11,6 +11,7 @@ from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.solar import load_bs05_agsop
 from nu_waves.matter.msw import landau_zener_for_pair
 from nu_waves.backends import make_torch_mps_backend
+import nu_waves.utils.style
 
 
 # toggle for CPU/GPU
@@ -42,7 +43,7 @@ osc = Oscillator(
 )
 
 # ---- physics knobs ----
-E_GeV  = 0.002      # 2 MeV
+E_GeV  = 0.01      # 2 MeV
 r_emit = 0.05 * sol.R_sun_km
 
 # distances from emission to surface; include 0 for initial marker
