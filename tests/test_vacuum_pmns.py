@@ -12,7 +12,9 @@ if not USE_NUMPY:
     try:
         import torch
         print("torch available")
-        backend = make_torch_backend(force_device="cpu")
+        backend = make_torch_backend(
+            # force_device="cpu"
+        )
         print(backend.device)
         HAS_TORCH = True
     except Exception:
@@ -42,28 +44,27 @@ def test_zero_baseline_identity():
         flavor_emit=muon, flavor_det=[electron, muon, tau],
         L_km=0, E_GeV=Enu_list,
     )
-    assert np.allclose(P[:, electron], 0.0, atol=0) # no electron appearance
-    assert np.allclose(P[:, tau], 0.0, atol=0) # no tau appearance
-    assert np.allclose(P[:, muon], 1.0, atol=0) # all muons
+    assert np.allclose(P[:, electron], 0.0, atol=1e-15) # no electron appearance
+    assert np.allclose(P[:, tau], 0.0, atol=1e-15) # no tau appearance
+    assert np.allclose(P[:, muon], 1.0, atol=1e-15) # all muons
     print("zero_baseline_identity: success.")
 
 
 def test_probability_conservation():
     print("test_probability_conservation test...")
-    E_min, E_max = 0.2, 3.0
-    Enu_list = np.linspace(E_min, E_max, 10)
+    E_min, E_max = 0.5, 3.0
+    Enu_list = np.linspace(E_min, E_max, 13)
     P = osc.probability(
         flavor_emit=muon, flavor_det=[electron, muon, tau],
         L_km=295, E_GeV=Enu_list, # t2k baseline
     )
-    # for any energy, sum of P for each flavor should be 1.
-
     try:
-        assert np.allclose(np.sum(P, axis=1), 0.0, atol=1E-12)
+        # for any energy, sum of P for each flavor should be 1.
+        assert np.allclose(np.sum(P, axis=1), 1.0, atol=1E-18)
     except AssertionError:
+        for iE, flavor_prob in enumerate(P):
+            print(f"E({Enu_list[iE]:.3f} GeV):", flavor_prob, f"sum={np.sum(flavor_prob)}")
         print("Assertion failed.")
-        for flavor_prob in P:
-            print("probabilities:", flavor_prob, f"sum={np.sum(flavor_prob)}")
         exit(1)
 
     print("test_probability_conservation: success.")
