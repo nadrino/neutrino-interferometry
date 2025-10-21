@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 import numpy as np
+from tqdm import tqdm
+from typing import Tuple, Callable, Iterable
 
 from nu_waves.utils.units import GF
+from nu_waves.sources.sun import R_SUN, SolarModel, SolarSource
 
 
 @dataclass
@@ -119,3 +122,120 @@ def resonance_Ne_12(Delta_m2_21_eV2: float, theta12_rad: float, E_MeV: np.ndarra
     # If your Hamiltonian uses eV, include appropriate conversion factors.
     # Here we return 'effective Ne' in the same units used in matter_potential_from_Ne.
     return (Delta_m2_21_eV2 * cos2) / (2.0 * np.sqrt(2.0) * GF * E_MeV)
+
+
+# --- exit mass fractions for (E, r_emit)
+def exit_mass_fractions_single(
+    osc,
+    profile,
+    E_GeV: float,
+    r_emit_km: float,
+    n_steps: int = 512,
+    alpha: int = 0,
+    antineutrino: bool = False,
+) -> np.ndarray:
+    """
+    Returns p_i at the solar surface (mass-state exit fractions) for one energy and one emission radius.
+    Uses your existing adiabatic solver.
+    """
+    s_end = float(max(R_SUN - r_emit_km, 0.0))
+    if s_end == 0.0:
+        # Emission at surface: already in vacuum eigenbasis
+        F_last = np.zeros(osc.dim)
+        F_last[:] = 0.0
+        F_last[0] = 1.0  # if you emitted a pure νe at the surface
+        return F_last
+
+    s_km = np.linspace(0.0, s_end, int(n_steps))
+    F = osc.adiabatic_mass_fractions_from_emission(
+        E_GeV=E_GeV,
+        profile=profile,
+        r_emit_km=r_emit_km,
+        s_km=s_km,
+        alpha=alpha,
+        antineutrino=antineutrino,
+    )  # shape (n_steps, Nstates)
+    return np.asarray(F[-1], dtype=float)  # (Nstates,)
+
+
+# --- Production-radius nodes/weights from SolarModel radial pdf
+def radial_nodes_and_weights_from_pdf(
+    model: SolarModel,
+    source: SolarSource,
+    n_nodes: int = 48,
+    r_grid_size: int = 6000,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Builds importance-sampled nodes via inverse-CDF over r in [0, R_SUN].
+    Returns:
+      r_nodes_km: (n_nodes,) radii
+      w_nodes:    (n_nodes,) probabilities, sum to 1
+    """
+    r = np.linspace(0.0, R_SUN, r_grid_size)
+    fr = model.radial_pdf(source, r)
+    # CDF via trapezoid integration (stable in core)
+    cdf = np.cumsum(0.5 * (fr[1:] + fr[:-1]) * np.diff(r))
+    cdf = np.concatenate([[0.0], cdf])
+    if cdf[-1] == 0.0:
+        raise RuntimeError("Radial pdf normalization is zero.")
+    cdf /= cdf[-1]
+    # Equal-probability bins → midpoints as nodes
+    q_edges = np.linspace(0.0, 1.0, n_nodes + 1)
+    r_edges = np.interp(q_edges, cdf, r)
+    r_nodes = 0.5 * (r_edges[:-1] + r_edges[1:])
+    w_nodes = np.diff(q_edges)  # sums to 1
+    return r_nodes, w_nodes
+
+# --- Average p_i over production radius for a vector of energies
+def exit_mass_fractions_averaged_over_radius(
+    osc,
+    profile,
+    E_GeV: np.ndarray,
+    r_nodes_km: np.ndarray,
+    w_nodes: np.ndarray,
+    n_steps_per_ray: int = 50,
+) -> np.ndarray:
+    """
+    Returns p_mass(E,i) of shape (len(E_GeV), Nstates),
+    averaged over the provided (r_nodes, w_nodes).
+    """
+    E_GeV = np.asarray(E_GeV, dtype=float)
+    nE = E_GeV.size
+    # infer number of states from osc
+    # Assuming osc.dim exists; else use len(osc.m2_list)
+    nstates = getattr(osc, "dim", len(osc.m2_list))
+    out = np.zeros((nE, nstates), dtype=float)
+    for ie, E in tqdm(enumerate(E_GeV), total=nE, desc=f"Processing {E} MeV"):
+        acc = np.zeros(nstates, dtype=float)
+        for r, w in zip(r_nodes_km, w_nodes):
+            p = exit_mass_fractions_single(
+                osc, profile, E, r, n_steps=n_steps_per_ray, alpha=0, antineutrino=False
+            )
+            acc += w * p
+        out[ie, :] = acc
+    return out  # (nE, nstates)
+
+# --- Daytime Pee from exit fractions and U
+def pee_day_from_exit_fractions(
+    p_mass: np.ndarray,  # (nE, nstates)
+    U: np.ndarray,       # mixing matrix (flavor x mass)
+) -> np.ndarray:
+    """
+    Daytime / vacuum-averaged propagation from Sun to Earth:
+      Pee(E) = sum_i p_i(E) * |U_ei|^2
+    """
+    Uei2 = np.abs(U[0, :]) ** 2
+    return (p_mass * Uei2[None, :]).sum(axis=1)
+
+# --- Sanity-limit hlpers for plotting bands
+def pee_lowE_vacuum_avg(U: np.ndarray) -> float:
+    """ Low-E (vacuum-averaged) limit: Σ_i |U_ei|^4 """
+    row = np.abs(U[0, :]) ** 2
+    return float((row ** 2).sum())
+
+def pee_highE_msw(U: np.ndarray, mass_index: int = 1) -> float:
+    """
+    High-E adiabatic LMA limit ~ |U_e2|^2 in NO.
+    'mass_index=1' is the column for ν2 if your ordering is [1,2,3].
+    """
+    return float(np.abs(U[0, mass_index]) ** 2)
