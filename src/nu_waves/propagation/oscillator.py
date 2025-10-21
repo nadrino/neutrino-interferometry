@@ -129,11 +129,11 @@ class Oscillator:
                     S = linalg.matrix_exp((-1j) * HL)
                 else:
                     # HL is Hermitian (H Hermitian, scalar L). Use batched eigh:
-                    evals, evecs = np.linalg.eigh(HL)  # (B,N), (B,N,N)
-                    phases = np.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)  # (B,N)
+                    evals, evecs = xp.linalg.eigh(HL)  # (B,N), (B,N,N)
+                    phases = xp.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)  # (B,N)
                     # S = evecs @ diag(phases) @ evecs^\dagger, fully vectorized:
-                    S = evecs * phases[:, np.newaxis, :]  # (B,N,N)
-                    S = S @ np.conjugate(evecs).transpose(0, 2, 1)  # (B,N,N)
+                    S = evecs * phases[:, xp.newaxis, :]  # (B,N,N)
+                    S = S @ xp.conjugate(evecs).transpose(0, 2, 1)  # (B,N,N)
 
             else:
                 # layered profile
@@ -167,29 +167,28 @@ class Oscillator:
                         # slower
                         Sk = linalg.matrix_exp((-1j) * HLk)
                     else:
-                        evals, evecs = np.linalg.eigh(HLk)
-                        phases = np.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)  # (B,N)
-                        Sk = evecs * phases[:, np.newaxis, :]
-                        Sk = Sk @ np.conjugate(evecs).transpose(0, 2, 1)  # (B,N,N)
+                        evals, evecs = xp.linalg.eigh(HLk)
+                        phases = xp.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)  # (B,N)
+                        Sk = evecs * phases[:, xp.newaxis, :]
+                        Sk = Sk @ xp.conjugate(evecs).transpose(0, 2, 1)  # (B,N,N)
 
                     S = Sk @ S  # pre-multiply: S_tot = S_k * S_tot
         else:
-            if is_torch:
-                # generic slow path (Torch or SciPy backend)
+            if is_torch and False:
+                # exponentiation is much slower
                 H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)
                 HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
                 S = linalg.matrix_exp((-1j) * HL)
             else:
                 # --- VACUUM FAST PATH (NumPy) ---
-                # S = U diag(exp(-i * m2 * L/E * const)) U^\dagger
-                U = np.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)  # (N,N)
+                U = xp.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)  # (N,N)
                 # Expect mass-squared as a length-N array on the Hamiltonian; if not available, fall back to H+eigh
-                m2 = np.asarray(self.hamiltonian.m2_diag, dtype=self.backend.dtype_real)  # (N,)
+                m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=self.backend.dtype_real)  # (N,)
                 phase = (KM * L_flat / E_flat)[:, None] * m2[None, :]  # (B,N)
-                phases = np.exp((-1j) * phase).astype(self.backend.dtype_complex, copy=False)  # (B,N)
+                phases = xp.exp((-1j) * phase).astype(self.backend.dtype_complex, copy=False)  # (B,N)
 
-                Uc = np.conjugate(U).T  # (N,N)
-                U_phase = U[np.newaxis, :, :] * phases[:, np.newaxis, :]  # (B,N,N)
+                Uc = xp.conjugate(U).T  # (N,N)
+                U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]  # (B,N,N)
                 S = U_phase @ Uc  # (B,N,N)
 
         if not use_sampling:
