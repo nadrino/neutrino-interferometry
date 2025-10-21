@@ -35,14 +35,39 @@ osc = Oscillator(
     backend=backend,
 )
 
+def test_syntax():
+    print("test_syntax test...")
+    P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10))
+    assert P.shape == (10, 3, 3)
+    P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_emit=muon)
+    assert P.shape == (10, 3)
+    P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_det=muon)
+    assert P.shape == (10, 3)
+    P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_emit=muon, flavor_det=[muon, electron])
+    assert P.shape == (10, 2)
+    P = osc.probability(
+        L_km=np.linspace(0, 300, 10),
+        E_GeV=np.linspace(0.2, 3.0, 10),
+        flavor_emit=muon, flavor_det=[muon, electron]
+    )
+    assert P.shape == (10, 2)
+    try:
+        P = osc.probability(
+            L_km=np.linspace(0, 300, 11),
+            E_GeV=np.linspace(0.2, 3.0, 10),
+            flavor_emit=muon, flavor_det=[muon, electron]
+        )
+        # SHOULD PRODUCE AN ERROR
+        assert False
+    except ValueError:
+        pass
+    print("test_syntax test success.")
 
 def test_zero_baseline_identity():
     print("zero_baseline_identity test...")
-    E_min, E_max = 0.2, 3.0
-    Enu_list = np.linspace(E_min, E_max, 10)
     P = osc.probability(
         flavor_emit=muon, flavor_det=[electron, muon, tau],
-        L_km=0, E_GeV=Enu_list,
+        L_km=0, E_GeV=np.linspace(0.2, 3.0, 10),
     )
     assert np.allclose(P[:, electron], 0.0, atol=1e-15) # no electron appearance
     assert np.allclose(P[:, tau], 0.0, atol=1e-15) # no tau appearance
@@ -70,5 +95,6 @@ def test_probability_conservation():
     print("test_probability_conservation: success.")
 
 
+test_syntax()
 test_zero_baseline_identity()
 test_probability_conservation()
