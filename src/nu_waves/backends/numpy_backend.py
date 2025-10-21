@@ -88,6 +88,7 @@ class _NumpyLinalg:
 def make_numpy_backend(seed=0):
     class Backend: ...
     backend = Backend()
+    backend.name = "numpy"
     backend.device = "cpu"
     backend.dtype_real = np.float64
     backend.dtype_complex = np.complex128

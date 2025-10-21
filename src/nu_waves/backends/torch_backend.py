@@ -209,6 +209,7 @@ def make_torch_backend(seed=0, use_complex64=True, force_device=None):
 
     class Backend: ...
     backend = Backend()
+    backend.name = "torch"
     backend.device = device
     backend.dtype_real = dtype_real
     backend.dtype_complex = dtype_complex
