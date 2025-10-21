@@ -33,6 +33,7 @@ class Oscillator:
         self.hamiltonian = None
         self.set_parameters(mixing_matrix=mixing_matrix, m2_list=m2_list)
 
+        self._use_matter = False
         self.use_exponentiation = use_exponentiation
 
         # samplers: callable(center_array, n_samples)
@@ -74,176 +75,302 @@ class Oscillator:
         self._matter_args = None
         self._matter_profile = None
 
-    # ----------------------------------------------------------------------
-    def probability(self,
-                    flavor_emit = None,
-                    flavor_det = None,
-                    L_km = 0.0,
-                    E_GeV = 1.0,
-                    antineutrino: bool = False
-                    ):
+    # helpers to make sure the pullback from the GPU memory happens once
+    def propagate_state(self, flavor_emit, L_km, E_GeV, antineutrino=False):
+        return self.backend.to_device(
+            self._propagate_state(flavor_emit=flavor_emit, L_km=L_km, E_GeV=E_GeV, antineutrino=antineutrino)
+        )
+
+    def probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
+        return self.backend.to_device(
+            self._probability(
+                L_km=L_km, E_GeV=E_GeV, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino
+            )
+        )
+
+    def _propagate_state(self, flavor_emit, L_km, E_GeV, antineutrino=False):
+        """
+        Return psi(L) = S(L,E) |nu_alpha> in flavour basis.
+
+        Accepts scalar flavor_emit (int 0..N-1) and scalar or 1D arrays for L,E.
+        Evaluates pairwise: if both L_km and E_GeV are arrays, their lengths must match.
+        Returns (..., N) with the same semantics as probability().
+        """
         xp = self.backend.xp
         linalg = self.backend.linalg
-        is_torch = self.backend.name == "torch"
 
-        # ---------- normalize inputs & detect grid/pairs ----------
+        # ---------- normalize inputs ----------
         L_in = xp.asarray(L_km, dtype=self.backend.dtype_real)
         E_in = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
 
-        # grid_mode = (L_in.ndim == 1 and E_in.ndim == 1 and L_in.size > 1 and E_in.size > 1)
-        grid_mode = (
-              L_in.ndim == 1 and E_in.ndim == 1
-              and int(L_in.shape[0]) > 1 and int(E_in.shape[0]) > 1
-        )
+        # Ensure 1D shape for both
+        if L_in.ndim == 0:
+            L_in = L_in.reshape(1)
+        if E_in.ndim == 0:
+            E_in = E_in.reshape(1)
 
-        if grid_mode:
-            Lc, Ec = xp.meshgrid(L_in, E_in, indexing="ij")          # (nL,nE)
+        # ---------- enforce pairwise semantics ----------
+        if L_in.size == 1 and E_in.size > 1:
+            # broadcast single baseline
+            Lc = xp.broadcast_to(L_in, E_in.shape)
+            Ec = E_in
+        elif E_in.size == 1 and L_in.size > 1:
+            # broadcast single energy
+            Lc = L_in
+            Ec = xp.broadcast_to(E_in, L_in.shape)
         else:
-            Lc, Ec = xp.broadcast_arrays(L_in, E_in)                  # same-shape S
-            if Lc.ndim == 0:  # both scalars
-                Lc = Lc.reshape(1); Ec = Ec.reshape(1)
+            # both arrays
+            if L_in.size != E_in.size:
+                raise ValueError(
+                    f"Length mismatch: L_km has {L_in.size}, E_GeV has {E_in.size}. "
+                    "They must match for pairwise evaluation."
+                )
+            Lc, Ec = L_in, E_in
 
-        center_shape = Lc.shape                                       # S
+        center_shape = Lc.shape  # always (n,)
+        grid_mode = False  # never 2D grids
 
         # ---------- sampling or no-sampling paths ----------
         use_sampling = (self.energy_sampler is not None) or (self.baseline_sampler is not None)
         if not use_sampling:
-            # --- original path (no overhead) ---
-            E_flat = Ec.reshape(-1)                                   # (B,)
-            L_flat = Lc.reshape(-1)                                   # (B,)
+            E_flat = Ec.reshape(-1)
+            L_flat = Lc.reshape(-1)
         else:
-            # --- smeared path ---
             ns = int(max(1, self.n_samples))
-            def _tile(x): return xp.repeat_last(x, ns)
-            Es = self.energy_sampler(Ec, ns) if self.energy_sampler else _tile(Ec)  # S+(ns,)
+
+            def _tile(x):
+                return xp.repeat_last(x, ns)
+
+            Es = self.energy_sampler(Ec, ns) if self.energy_sampler else _tile(Ec)
             Ls = self.baseline_sampler(Lc, ns) if self.baseline_sampler else _tile(Lc)
             E_flat = Es.reshape(-1)
             L_flat = Ls.reshape(-1)
 
         KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
 
+        # ---------- Hamiltonian evolution ----------
         if getattr(self, "_use_matter", False):
-
             if getattr(self, "_matter_profile", None) is None:
                 # constant matter density
-                rho, Ye = self._matter_args  # set via helper
-
+                rho, Ye = self._matter_args
                 H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
                 HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
                 if self.use_exponentiation:
-                    # slower
                     S = linalg.matrix_exp((-1j) * HL)
                 else:
-                    # HL is Hermitian (H Hermitian, scalar L). Use batched eigh:
-                    evals, evecs = xp.linalg.eigh(HL)  # (B,N), (B,N,N)
-                    phases = xp.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)  # (B,N)
-                    # S = evecs @ diag(phases) @ evecs^\dagger, fully vectorized:
-                    S = evecs * phases[:, xp.newaxis, :]  # (B,N,N)
-                    S = S @ xp.conjugate(evecs).transpose(0, 2, 1)  # (B,N,N)
-
+                    evals, evecs = xp.linalg.eigh(HL)
+                    phases = xp.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)
+                    S = evecs * phases[:, xp.newaxis, :]
+                    S = S @ xp.conjugate(evecs).transpose(0, 2, 1)
             else:
                 # layered profile
                 prof = self._matter_profile
-                # per-center ΔL_k arrays, each shaped like L_flat (broadcast-safe across grid or pairs)
-                dL_list = prof.resolve_dL(self.backend.from_device(L_flat))  # resolve in host float
+                dL_list = prof.resolve_dL(self.backend.from_device(L_flat))
                 dL_list = [xp.asarray(dL, dtype=self.backend.dtype_real) for dL in dL_list]
 
-                # accumulate S_tot = S_K @ ... @ S_1 (source→detector order = list order)
                 N = self.hamiltonian.U.shape[0]
-                S = xp.eye(N, dtype=self.backend.dtype_complex)[xp.newaxis, ...]  # (1,N,N) seed
-
-                if hasattr(S, "clone"):  # Torch tensors
-                    S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).clone()
-                else:  # NumPy arrays
-                    S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()
-
-                # S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()  # (B,N,N) identities
+                S = xp.eye(N, dtype=self.backend.dtype_complex)[xp.newaxis, ...]
+                S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()
 
                 for k, layer in enumerate(prof.layers):
-
                     Hk = self.hamiltonian.matter_constant(
                         E_flat,
                         rho_gcm3=layer.rho_gcm3,
                         Ye=layer.Ye,
-                        antineutrino=antineutrino
-                    )  # (B,N,N)
+                        antineutrino=antineutrino,
+                    )
                     HLk = Hk * (dL_list[k] * KM)[:, xp.newaxis, xp.newaxis]
-
                     if self.use_exponentiation:
-                        # slower
                         Sk = linalg.matrix_exp((-1j) * HLk)
                     else:
                         evals, evecs = xp.linalg.eigh(HLk)
-                        phases = xp.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)  # (B,N)
+                        phases = xp.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)
                         Sk = evecs * phases[:, xp.newaxis, :]
-                        Sk = Sk @ xp.conjugate(evecs).transpose(0, 2, 1)  # (B,N,N)
-
-                    S = Sk @ S  # pre-multiply: S_tot = S_k * S_tot
+                        Sk = Sk @ xp.conjugate(evecs).transpose(0, 2, 1)
+                    S = Sk @ S
         else:
+            # vacuum propagation
             if self.use_exponentiation:
-                # exponentiation is much slower
                 H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)
                 HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
                 S = linalg.matrix_exp((-1j) * HL)
             else:
-                # --- VACUUM FAST PATH (NumPy) ---
-                U = xp.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)  # (N,N)
-                # Expect mass-squared as a length-N array on the Hamiltonian; if not available, fall back to H+eigh
-                m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=self.backend.dtype_real)  # (N,)
-                phase = (KM * L_flat / E_flat)[:, None] * m2[None, :]  # (B,N)
-                phases = xp.exp((-1j) * phase).astype(self.backend.dtype_complex, copy=False)  # (B,N)
+                U = xp.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)
+                m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=self.backend.dtype_real)
+                phase = (KM * L_flat / E_flat)[:, None] * m2[None, :]
+                phases = xp.exp((-1j) * phase).astype(self.backend.dtype_complex, copy=False)
+                Uc = xp.conjugate(U).T
+                U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]
+                S = U_phase @ Uc
 
-                Uc = xp.conjugate(U).T  # (N,N)
-                U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]  # (B,N,N)
-                S = U_phase @ Uc  # (B,N,N)
+        # ---------- apply emission flavour ----------
+        N = S.shape[-1]
 
-        if not use_sampling:
-            # using true
-            P = (xp.abs(S) ** 2).reshape(*center_shape, S.shape[-2], S.shape[-1])  # S+(N,N)
-        else:
-            # smearings
-            P = (xp.abs(S) ** 2).reshape(*center_shape, ns, S.shape[-2], S.shape[-1]).mean(axis=-3)  # S+(N,N)
-
-        # ---------- squeeze scalar axes like before ----------
-        if not grid_mode:
-            if L_in.ndim == 0 and E_in.ndim == 0:     # both scalars
-                P = P[0]
-            elif P.shape[0] == 1:
-                P = P[0]
-
-        # ---------- flavor selection (same rules as before) ----------
         def _as_idx(x, N):
             if x is None:
                 return xp.arange(N)
             x = xp.asarray(x)
             return int(x) if x.ndim == 0 else x
 
-        N = P.shape[-1]
-        a = _as_idx(flavor_emit, N)
-        b = _as_idx(flavor_det, N)
+        a_idx = _as_idx(flavor_emit, N)
+        a_scalar = xp.isscalar(a_idx)
 
-        if flavor_emit is None and flavor_det is None:
-            return self.backend.from_device(P)
-
-        a_scalar = xp.isscalar(a)
-        b_scalar = xp.isscalar(b)
-
-        if not is_torch:
-            # NumPy path (unchanged)
-            out = P[..., b, a] if (a_scalar and b_scalar) or (a_scalar and not b_scalar) or (not a_scalar and b_scalar) else P[..., self.backend.xp.ix_(b, a)]
+        if a_scalar:
+            e_a = xp.zeros((N,), dtype=self.backend.dtype_complex)
+            e_a[a_idx] = 1.0
+            psi = S @ e_a  # (B, N)
         else:
-            # Torch path uses index_select (advanced indexing parity)
-            to_idx = lambda x: xp.asarray(x, int)
-            if a_scalar and b_scalar:
-                out = P[..., int(b), int(a)]
-            elif a_scalar and not b_scalar:
-                out = P.index_select(-2, to_idx(b))[..., int(a)]
-            elif not a_scalar and b_scalar:
-                out = P.index_select(-1, to_idx(a)).index_select(-2, to_idx(b))
-            else:
-                out = P.index_select(-2, to_idx(b)).index_select(-1, to_idx(a))
+            N_emit = len(a_idx)
+            e_a = xp.zeros((N_emit, N), dtype=self.backend.dtype_complex)
+            e_a[xp.arange(N_emit), xp.asarray(a_idx, int)] = 1.0
+            psi = xp.einsum("bij,kj->bki", S, e_a)  # (B, N_emit, N)
 
-        return self.backend.from_device(out)
+        # ---------- reshape back to center shape ----------
+        if not use_sampling:
+            psi = psi.reshape(*center_shape, *psi.shape[1:])
+        else:
+            psi = psi.reshape(*center_shape, ns, *psi.shape[1:]).mean(axis=-3)
+
+        # ---------- squeeze scalar axes ----------
+        if L_in.size == 1 and E_in.size == 1:
+            psi = psi[0]
+        elif psi.shape[0] == 1:
+            psi = psi[0]
+
+        return psi
+
+    def _project_state(self, psi, E_GeV=None, antineutrino=None):
+        """
+        Project a propagated state psi(..., N) from flavour basis onto
+        the mass/matter eigenbasis.
+
+        psi may have arbitrary leading dimensions (e.g. (nE, nEmit, N)).
+        Returns:
+            a  : same leading shape as psi, last dim = N (mass amplitudes)
+            V  : eigenvector matrix (N,N) or batch (nE,N,N)
+        """
+        xp = self.backend.xp
+
+        # choose projection matrix V (vacuum or matter)
+        if not self._use_matter:
+            V = xp.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)  # (N,N)
+        else:
+            assert E_GeV is not None, "Need E_GeV to diagonalize Hamiltonian in matter."
+            rho, Ye = (
+                self._matter_args if getattr(self, "_matter_profile", None) is None
+                else (self._matter_profile.layers[-1].rho_gcm3,
+                      self._matter_profile.layers[-1].Ye)
+            )
+            import numpy as np
+            E_arr = xp.asarray(E_GeV, dtype=self.backend.dtype_real).reshape(-1)
+            H = self.hamiltonian.matter_constant(E_arr, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
+            evals, V_np = np.linalg.eigh(self.backend.from_device(H))
+            V = xp.asarray(V_np, dtype=self.backend.dtype_complex)  # (nE,N,N)
+
+        # Determine number of flavour components
+        N = psi.shape[-1]
+        lead_shape = psi.shape[:-1]  # e.g. (10,3)
+        psi_view = psi.reshape(-1, N)  # flatten leading dims only for batched multiplication
+
+        # --- Apply projection ---
+        if V.ndim == 2:
+            # one global matrix (vacuum)
+            a_flat = (xp.conjugate(V).T @ psi_view.T).T  # (B,N)
+        else:
+            # batch of matrices (one per energy)
+            # we need to broadcast correctly: (nE,N,N) with psi_view (nE*nEmit,N)
+            nE = V.shape[0]
+            nEmit = psi.size // (nE * N)
+            psi_view = psi.reshape(nE, nEmit, N)
+            a_flat = xp.einsum("bij,bkj->bki", xp.conjugate(V), psi_view)  # (nE,nEmit,N)
+
+        # --- reshape back to original leading shape ---
+        a = a_flat.reshape(*lead_shape, N)
+
+        return a, V
+
+    def _probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
+        return self._probability_split_adiabatic(
+            L_km=L_km, E_GeV=E_GeV, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino
+        )["total"]
+
+    def _probability_split_adiabatic(self, L_km, E_GeV,
+                                     flavor_emit=None, flavor_det=None,
+                                     antineutrino=False):
+        xp = self.backend.xp
+
+        # --- Step 1: propagate and project onto mass basis ---
+        psi = self._propagate_state(flavor_emit=flavor_emit,
+                                    L_km=L_km, E_GeV=E_GeV,
+                                    antineutrino=antineutrino)
+        a, V = self._project_state(
+            psi=psi,
+            E_GeV=E_GeV if self._use_matter else None,
+            antineutrino=antineutrino if self._use_matter else None
+        )
+        # a: (E,N) or (E,A,N)
+        N = a.shape[-1]
+        lead_shape = a.shape[:-1]
+        nE = lead_shape[0]
+        nEmit = 1 if a.ndim == 2 else lead_shape[1]
+
+        # --- Step 2: indices (keep scalar flags BEFORE list conversion) ---
+        def _as_idx(x, N):
+            if x is None:
+                return xp.arange(N)
+            x = xp.asarray(x)
+            return int(x) if x.ndim == 0 else x
+
+        a_idx_raw = _as_idx(flavor_emit, N)
+        b_idx_raw = _as_idx(flavor_det, N)
+        a_scalar_in = xp.isscalar(a_idx_raw)
+        b_scalar_in = xp.isscalar(b_idx_raw)
+        a_idx = [a_idx_raw] if a_scalar_in else a_idx_raw
+        b_idx = [b_idx_raw] if b_scalar_in else b_idx_raw
+        nDet = len(b_idx)
+
+        # --- Step 3: build flavour projectors ---
+        if V.ndim == 2:
+            Vb = V[b_idx, :]  # (B,N)
+            Vb = xp.broadcast_to(Vb, (nE, nDet, N))  # (E,B,N)
+        else:
+            Vb = V[:, b_idx, :]  # (E,B,N)
+
+        # --- Step 4: amplitudes & probabilities ---
+        if a.ndim == 2:
+            # single emitter: a (E,N) -> A_i (E,B,N)
+            A_i = Vb * a[:, None, :]  # (E,B,N)
+            P_incoh = xp.sum(xp.abs(A_i) ** 2, axis=-1)  # (E,B)
+            P_total = xp.abs(xp.sum(A_i, axis=-1)) ** 2  # (E,B)
+            P_int = P_total - P_incoh  # (E,B)
+        else:
+            # multiple emitters: a (E,A,N) -> A_i (E,B,A,N)
+            A_i = Vb[:, :, None, :] * a[:, None, :, :]  # (E,B,A,N)
+            P_incoh = xp.sum(xp.abs(A_i) ** 2, axis=-1)  # (E,B,A)
+            P_total = xp.abs(xp.sum(A_i, axis=-1)) ** 2  # (E,B,A)
+            P_int = P_total - P_incoh  # (E,B,A)
+
+        # --- Step 5: if detector is scalar, squeeze the B axis (axis=1) ---
+        if b_scalar_in:
+            # (E,B)   -> (E,)     ; (E,B,A) -> (E,A)
+            P_total = xp.squeeze(P_total, axis=1)
+            P_incoh = xp.squeeze(P_incoh, axis=1)
+            P_int = xp.squeeze(P_int, axis=1)
+
+        return {
+            "total": self.backend.from_device(P_total),
+            "incoherent": self.backend.from_device(P_incoh),
+            "interference": self.backend.from_device(P_int),
+        }
+
+    # def _get_mass_fractions_after(self, flavor_emit, L_km, E_GeV, antineutrino=False, return_amplitudes=False, psi=None):
+    #
+    #     if psi is None:
+    #         psi = self._propagate_state(flavor_emit, L_km, E_GeV, antineutrino)
+    #
+    #     xp = self.backend.xp
+    #
+    #     return (xp.abs(a) ** 2).astype(self.backend.dtype_real, copy=False)
 
     def adiabatic_mass_fractions(
           self,
