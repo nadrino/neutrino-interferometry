@@ -55,6 +55,9 @@ class Oscillator:
             backend=self.backend
         )
 
+    def set_backend(self, backend):
+        self.backend = backend or make_numpy_backend()
+        self.hamiltonian.set_backend(self.backend)
 
     def set_constant_density(self, rho_gcm3: float, Ye: float = 0.5):
         self._use_matter = True

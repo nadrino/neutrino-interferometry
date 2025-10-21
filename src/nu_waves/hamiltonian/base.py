@@ -9,9 +9,10 @@ class Hamiltonian:
         U: (N,N) complex PMNS (ou 3+N)
         m2_diag: (N,N) diag(m_i^2) [eV^2]
         """
-        self.backend = backend or make_numpy_backend()
-        xp = self.backend.xp
+        self.backend = None
+        self.set_backend(backend)
 
+        xp = self.backend.xp
         self.U = xp.asarray(mixing_matrix, dtype=self.backend.dtype_complex)
         m2 = xp.asarray(m2_diag, dtype=self.backend.dtype_real)
         if m2.ndim == 2:
@@ -20,6 +21,9 @@ class Hamiltonian:
         self.m2_diag = m2.reshape(-1)
         # self.U = mixing_matrix
         # self.m2_diag = m2_diag
+
+    def set_backend(self, backend):
+        self.backend = backend or make_numpy_backend()
 
     def vacuum(self, E_GeV, antineutrino: bool = False):
         """
