@@ -9,7 +9,7 @@ backend = None
 try:
     import torch
     print("torch available")
-    backend = make_torch_backend()
+    backend = make_torch_backend(force_device="cpu")
     print(backend.device)
     HAS_TORCH = True
 except Exception:
