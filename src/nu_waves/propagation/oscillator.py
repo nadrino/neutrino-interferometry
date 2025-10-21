@@ -88,13 +88,113 @@ class Oscillator:
             )
         )
 
-    def _propagate_state(self, flavor_emit, L_km, E_GeV, antineutrino=False):
+    # private
+    def _generate_initial_state(self, flavor_emit, E_GeV, antineutrino=False):
         """
-        Return psi(L) = S(L,E) |nu_alpha> in flavour basis.
+        Generate the initial state(s) |psi(0)> corresponding to the chosen
+        flavor(s) in the appropriate basis (flavour or matter).
 
-        Accepts scalar flavor_emit (int 0..N-1) and scalar or 1D arrays for L,E.
-        Evaluates pairwise: if both L_km and E_GeV are arrays, their lengths must match.
-        Returns (..., N) with the same semantics as probability().
+        Parameters
+        ----------
+        flavor_emit : int or array-like
+            Indices of emitting flavour(s). Example: 0=e, 1=mu, 2=tau.
+        E_GeV : float or 1D array
+            Neutrino energies. Used only if matter effects are enabled.
+        antineutrino : bool
+            Use the conjugate matter Hamiltonian if True.
+
+        Returns
+        -------
+        psi0 : array
+            Initial state(s), complex array with shape:
+              - (N,)              for a single flavour
+              - (nEmit, N)        for multiple flavours
+              - (nE, N) or (nE, nEmit, N) if matter effects cause energy dependence
+        """
+        xp = self.backend.xp
+        N = self.hamiltonian.U.shape[0]
+
+        # ---------- normalize indices ----------
+        def _as_idx(x, N):
+            if x is None:
+                return xp.arange(N)
+            x = xp.asarray(x)
+            return int(x) if x.ndim == 0 else x
+
+        a_idx = _as_idx(flavor_emit, N)
+        a_scalar = xp.isscalar(a_idx)
+        if a_scalar:
+            a_idx = [a_idx]
+
+        # ---------- vacuum or matter basis ----------
+        if not getattr(self, "_use_matter", False):
+            # --- simple flavour basis ---
+            psi0 = xp.zeros((len(a_idx), N), dtype=self.backend.dtype_complex)
+            psi0[xp.arange(len(a_idx)), xp.asarray(a_idx, int)] = 1.0
+            if len(a_idx) == 1:
+                psi0 = psi0[0]  # (N,)
+            return self.backend.from_device(psi0)
+
+        # --- matter case: energy dependence ---
+        E_in = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
+        if E_in.ndim == 0:
+            E_in = E_in.reshape(1)
+
+        if getattr(self, "_matter_profile", None) is None:
+            rho, Ye = self._matter_args
+            H = self.hamiltonian.matter_constant(E_in, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
+            evals, V_np = np.linalg.eigh(self.backend.from_device(H))
+            V = xp.asarray(V_np, dtype=self.backend.dtype_complex)  # (nE,N,N)
+        else:
+            # use density of first (production) layer
+            layer = self._matter_profile.layers[0]
+            rho, Ye = layer.rho_gcm3, layer.Ye
+            H = self.hamiltonian.matter_constant(E_in, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
+            evals, V_np = np.linalg.eigh(self.backend.from_device(H))
+            V = xp.asarray(V_np, dtype=self.backend.dtype_complex)
+
+        # ---------- project flavour states into matter basis ----------
+        # V transforms mass→flavour, so its conjugate columns correspond to flavour→mass
+        Vc = xp.conjugate(V)
+
+        if V.ndim == 2:
+            # single energy
+            psi0 = Vc[:, a_idx]  # (N, nEmit)
+            psi0 = xp.moveaxis(psi0, -1, 0)  # (nEmit, N)
+        else:
+            # multiple energies: (nE,N,N)
+            psi0 = Vc[:, :, a_idx]  # (nE,N,nEmit)
+            psi0 = xp.moveaxis(psi0, -1, -2)  # (nE,nEmit,N)
+
+        # --- squeeze scalar axes for consistency ---
+        if psi0.shape[0] == 1 and psi0.ndim == 3:
+            psi0 = psi0[0]
+        if psi0.ndim == 2 and psi0.shape[0] == 1:
+            psi0 = psi0[0]
+
+        return self.backend.from_device(psi0)
+
+    def _propagate_state(self, psi, L_km, E_GeV, antineutrino=False):
+        """
+        Return psi(L) = S(L,E) @ psi(0)
+
+        Parameters
+        ----------
+        psi : array-like
+            Initial state(s) in flavour basis. Can be:
+              - shape (N,)             for a single state
+              - shape (..., N)         for multiple states (e.g. (nEmit, N))
+        L_km, E_GeV : float or 1D array
+            Baseline(s) and energy(ies). Pairwise semantics: if both are arrays,
+            their lengths must match.
+        antineutrino : bool
+            Use conjugate Hamiltonian if True.
+
+        Returns
+        -------
+        psi_out : array
+            Propagated state(s) in flavour basis, with shape
+              (..., N) or (..., nEmit, N), matching psi and inputs.
         """
         xp = self.backend.xp
         linalg = self.backend.linalg
@@ -103,7 +203,6 @@ class Oscillator:
         L_in = xp.asarray(L_km, dtype=self.backend.dtype_real)
         E_in = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
 
-        # Ensure 1D shape for both
         if L_in.ndim == 0:
             L_in = L_in.reshape(1)
         if E_in.ndim == 0:
@@ -111,27 +210,23 @@ class Oscillator:
 
         # ---------- enforce pairwise semantics ----------
         if L_in.size == 1 and E_in.size > 1:
-            # broadcast single baseline
             Lc = xp.broadcast_to(L_in, E_in.shape)
             Ec = E_in
         elif E_in.size == 1 and L_in.size > 1:
-            # broadcast single energy
             Lc = L_in
             Ec = xp.broadcast_to(E_in, L_in.shape)
         else:
-            # both arrays
             if L_in.size != E_in.size:
                 raise ValueError(
                     f"Length mismatch: L_km has {L_in.size}, E_GeV has {E_in.size}. "
-                    "They must match for pairwise evaluation."
+                    "They must match for pairwise propagation."
                 )
             Lc, Ec = L_in, E_in
 
-        center_shape = Lc.shape  # always (n,)
-        grid_mode = False  # never 2D grids
-
-        # ---------- sampling or no-sampling paths ----------
+        center_shape = Lc.shape
         use_sampling = (self.energy_sampler is not None) or (self.baseline_sampler is not None)
+
+        # ---------- prepare flattened arrays ----------
         if not use_sampling:
             E_flat = Ec.reshape(-1)
             L_flat = Lc.reshape(-1)
@@ -148,10 +243,9 @@ class Oscillator:
 
         KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
 
-        # ---------- Hamiltonian evolution ----------
+        # ---------- evolution operator ----------
         if getattr(self, "_use_matter", False):
             if getattr(self, "_matter_profile", None) is None:
-                # constant matter density
                 rho, Ye = self._matter_args
                 H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
                 HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
@@ -163,7 +257,6 @@ class Oscillator:
                     S = evecs * phases[:, xp.newaxis, :]
                     S = S @ xp.conjugate(evecs).transpose(0, 2, 1)
             else:
-                # layered profile
                 prof = self._matter_profile
                 dL_list = prof.resolve_dL(self.backend.from_device(L_flat))
                 dL_list = [xp.asarray(dL, dtype=self.backend.dtype_real) for dL in dL_list]
@@ -174,10 +267,7 @@ class Oscillator:
 
                 for k, layer in enumerate(prof.layers):
                     Hk = self.hamiltonian.matter_constant(
-                        E_flat,
-                        rho_gcm3=layer.rho_gcm3,
-                        Ye=layer.Ye,
-                        antineutrino=antineutrino,
+                        E_flat, rho_gcm3=layer.rho_gcm3, Ye=layer.Ye, antineutrino=antineutrino
                     )
                     HLk = Hk * (dL_list[k] * KM)[:, xp.newaxis, xp.newaxis]
                     if self.use_exponentiation:
@@ -189,7 +279,7 @@ class Oscillator:
                         Sk = Sk @ xp.conjugate(evecs).transpose(0, 2, 1)
                     S = Sk @ S
         else:
-            # vacuum propagation
+            # vacuum
             if self.use_exponentiation:
                 H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)
                 HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
@@ -203,41 +293,28 @@ class Oscillator:
                 U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]
                 S = U_phase @ Uc
 
-        # ---------- apply emission flavour ----------
-        N = S.shape[-1]
-
-        def _as_idx(x, N):
-            if x is None:
-                return xp.arange(N)
-            x = xp.asarray(x)
-            return int(x) if x.ndim == 0 else x
-
-        a_idx = _as_idx(flavor_emit, N)
-        a_scalar = xp.isscalar(a_idx)
-
-        if a_scalar:
-            e_a = xp.zeros((N,), dtype=self.backend.dtype_complex)
-            e_a[a_idx] = 1.0
-            psi = S @ e_a  # (B, N)
+        # ---------- apply initial state(s) ----------
+        psi = xp.asarray(psi, dtype=self.backend.dtype_complex)
+        if psi.ndim == 1:
+            # single state (N,)
+            psi_out = xp.einsum("bij,j->bi", S, psi)  # (B,N)
         else:
-            N_emit = len(a_idx)
-            e_a = xp.zeros((N_emit, N), dtype=self.backend.dtype_complex)
-            e_a[xp.arange(N_emit), xp.asarray(a_idx, int)] = 1.0
-            psi = xp.einsum("bij,kj->bki", S, e_a)  # (B, N_emit, N)
+            # multiple states (...,N)
+            psi_out = xp.einsum("bij,kj->bki", S, psi)  # (B,nPsi,N)
 
-        # ---------- reshape back to center shape ----------
+        # ---------- reshape back ----------
         if not use_sampling:
-            psi = psi.reshape(*center_shape, *psi.shape[1:])
+            psi_out = psi_out.reshape(*center_shape, *psi_out.shape[1:])
         else:
-            psi = psi.reshape(*center_shape, ns, *psi.shape[1:]).mean(axis=-3)
+            psi_out = psi_out.reshape(*center_shape, ns, *psi_out.shape[1:]).mean(axis=-3)
 
         # ---------- squeeze scalar axes ----------
         if L_in.size == 1 and E_in.size == 1:
-            psi = psi[0]
-        elif psi.shape[0] == 1:
-            psi = psi[0]
+            psi_out = psi_out[0]
+        elif psi_out.shape[0] == 1:
+            psi_out = psi_out[0]
 
-        return psi
+        return psi_out
 
     def _project_state(self, psi, E_GeV=None, antineutrino=None):
         """
@@ -299,10 +376,11 @@ class Oscillator:
                                      antineutrino=False):
         xp = self.backend.xp
 
+        E_GeV = xp.broadcast_to(E_GeV, xp.shape(L_km)) if xp.ndim(L_km) == 1 and xp.ndim(E_GeV) == 0 else E_GeV
+
         # --- Step 1: propagate and project onto mass basis ---
-        psi = self._propagate_state(flavor_emit=flavor_emit,
-                                    L_km=L_km, E_GeV=E_GeV,
-                                    antineutrino=antineutrino)
+        psi0 = self._generate_initial_state(flavor_emit=flavor_emit, E_GeV=E_GeV, antineutrino=antineutrino)
+        psi = self._propagate_state(psi=psi0, L_km=L_km, E_GeV=E_GeV, antineutrino=antineutrino)
         a, V = self._project_state(
             psi=psi,
             E_GeV=E_GeV if self._use_matter else None,

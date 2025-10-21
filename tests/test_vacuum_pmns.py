@@ -51,6 +51,12 @@ def test_syntax():
         flavor_emit=muon, flavor_det=[muon, electron]
     )
     assert P.shape == (10, 2)
+    P = osc.probability(
+        L_km=np.linspace(0, 300, 10),
+        E_GeV=1,
+        flavor_emit=muon, flavor_det=[muon, electron]
+    )
+    assert P.shape == (10, 2)
     try:
         P = osc.probability(
             L_km=np.linspace(0, 300, 11),
