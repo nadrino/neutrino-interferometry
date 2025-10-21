@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
@@ -49,6 +50,6 @@ plt.ylim(0, 1.05)
 plt.legend()
 plt.tight_layout()
 
-plt.savefig("../figures/vacuum_pmns.jpg", dpi=150)
+plt.savefig("../figures/vacuum_pmns.jpg", dpi=150)  if not os.environ.get("CI") else None
 plt.show()
 
