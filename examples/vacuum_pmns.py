@@ -27,8 +27,8 @@ E_min, E_max = 0.2, 3.0
 Enu_list = np.linspace(E_min, E_max, 200)
 P = osc.probability(
     L_km=295, E_GeV=Enu_list,
-    alpha=flavors.muon,
-    beta=[flavors.electron, flavors.muon, flavors.tau],
+    flavor_emit=flavors.muon,
+    flavor_det=[flavors.electron, flavors.muon, flavors.tau],
     antineutrino=False
 )
 

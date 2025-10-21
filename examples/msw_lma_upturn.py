@@ -12,11 +12,11 @@ from nu_waves.matter.solar import (
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
-from nu_waves.backends.torch_backend import make_torch_mps_backend
+from nu_waves.backends.torch_backend import make_torch_backend
 from nu_waves.matter.solar import load_bs05_agsop # solar model
 
 # torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 # --- 0) User knobs
 SOURCE = SolarSource.B8

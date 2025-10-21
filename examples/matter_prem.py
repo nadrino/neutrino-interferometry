@@ -8,12 +8,12 @@ from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.prem import PREMModel
 from nu_waves.matter.profile import MatterProfile
-from nu_waves.backends import make_torch_mps_backend
+from nu_waves.backends import make_torch_backend
 import nu_waves.utils.style
 
 # toggle for CPU/GPU
 # torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 # choose one:
 # SCHEME = "prem_layers"      # exact PREM shells
@@ -38,21 +38,21 @@ prof = MatterProfile.from_segments(
 )
 osc.set_layered_profile(prof)
 E = np.linspace(2,8,200)
-P_fwd = osc.probability(L_km=sum(l.weight for l in prof.layers), E_GeV=E, alpha=1, beta=0)
+P_fwd = osc.probability(L_km=sum(l.weight for l in prof.layers), E_GeV=E, flavor_emit=1, flavor_det=0)
 
 # reverse the profile
 prof_rev = MatterProfile.from_segments(
     rho_gcm3=[11.0, 2.8], Ye=[0.467, 0.5], lengths_km=[2000.0, 3000.0]
 )
 osc.set_layered_profile(prof_rev)
-P_rev = osc.probability(L_km=sum(l.weight for l in prof_rev.layers), E_GeV=E, alpha=1, beta=0)
+P_rev = osc.probability(L_km=sum(l.weight for l in prof_rev.layers), E_GeV=E, flavor_emit=1, flavor_det=0)
 
 print("max |ΔP| (fwd vs rev) =", np.max(np.abs(P_fwd - P_rev)))  # should be >> 1e-3
 
 L = 8000.0
 E = np.linspace(1, 10, 400)
-P_NO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0)              # neutrinos, NO
-P_IO = osc.probability(L_km=L, E_GeV=E, alpha=1, beta=0, antineutrino=True)  # ν̄ in IO has the resonance
+P_NO = osc.probability(L_km=L, E_GeV=E, flavor_emit=1, flavor_det=0)              # neutrinos, NO
+P_IO = osc.probability(L_km=L, E_GeV=E, flavor_emit=1, flavor_det=0, antineutrino=True)  # ν̄ in IO has the resonance
 
 print("P_mu->e max (NO, ν):", P_NO.max(), "  P_mu->e max (IO, ν̄):", P_IO.max())
 
@@ -81,8 +81,8 @@ for cz in (-1e-3, +1e-3):
 
 prof1 = prem.profile_from_coszen(-1, scheme="prem_layers")
 prof2 = prem.profile_from_coszen(-1, scheme="hist_density", n_bins=4000, nbins_density=60)
-osc.set_layered_profile(prof1); P1 = osc.probability(L_km=sum(l.weight for l in prof1.layers), E_GeV=E, alpha=1, beta=0)
-osc.set_layered_profile(prof2); P2 = osc.probability(L_km=sum(l.weight for l in prof2.layers), E_GeV=E, alpha=1, beta=0)
+osc.set_layered_profile(prof1); P1 = osc.probability(L_km=sum(l.weight for l in prof1.layers), E_GeV=E, flavor_emit=1, flavor_det=0)
+osc.set_layered_profile(prof2); P2 = osc.probability(L_km=sum(l.weight for l in prof2.layers), E_GeV=E, flavor_emit=1, flavor_det=0)
 
 print("max |ΔP| prem vs hist =", np.max(np.abs(P1-P2)))
 
@@ -105,10 +105,10 @@ for iy, cz in tqdm(enumerate(cosz), total=len(cosz)):
     L_tot = float(sum(layer.weight for layer in prof.layers))
 
     # 3) compute ν and ν̄ for the two channels
-    P_mue_i      = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=0, antineutrino=False)
-    P_mumu_i     = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=1, antineutrino=False)
-    P_mue_bar_i  = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=0, antineutrino=True)
-    P_mumu_bar_i = osc.probability(L_km=L_tot, E_GeV=E_GeV, alpha=1, beta=1, antineutrino=True)
+    P_mue_i      = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=0, antineutrino=False)
+    P_mumu_i     = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=1, antineutrino=False)
+    P_mue_bar_i  = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=0, antineutrino=True)
+    P_mumu_bar_i = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=1, antineutrino=True)
 
     P_mue[iy], P_mumu[iy] = P_mue_i, P_mumu_i
     P_mue_bar[iy], P_mumu_bar[iy] = P_mue_bar_i, P_mumu_bar_i

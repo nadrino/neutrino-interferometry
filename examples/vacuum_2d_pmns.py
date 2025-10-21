@@ -6,7 +6,7 @@ from matplotlib.colors import LogNorm
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
-from nu_waves.backends import make_torch_mps_backend
+from nu_waves.backends import make_torch_backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
@@ -22,7 +22,7 @@ spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
 # toggle for CPU/GPU
 # torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 # oscillator
 osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
@@ -40,9 +40,9 @@ t0 = time.perf_counter()
 
 # --- Compute probabilities in grid mode (shape -> (nL, nE) after selection) ---
 # alpha=1 (muon), beta=0 (electron) → appearance
-P_mue = osc.probability(L_km=L_vals, E_GeV=E_vals, alpha=1, beta=0)   # (nL, nE)
+P_mue = osc.probability(L_km=L_vals, E_GeV=E_vals, flavor_emit=1, flavor_det=0)   # (nL, nE)
 # alpha=1 (muon), beta=1 (muon) → disappearance
-P_mumu = osc.probability(L_km=L_vals, E_GeV=E_vals, alpha=1, beta=1)  # (nL, nE)
+P_mumu = osc.probability(L_km=L_vals, E_GeV=E_vals, flavor_emit=1, flavor_det=1)  # (nL, nE)
 
 t1 = time.perf_counter()
 print(f"Computation time: {t1 - t0:.3f} s")

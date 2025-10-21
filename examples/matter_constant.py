@@ -23,11 +23,11 @@ osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 
 # calculate without matter effects
 osc.use_vacuum()
-P_vac = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,50), alpha=flavors.muon, beta=flavors.electron)
+P_vac = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,50), flavor_emit=flavors.muon, flavor_det=flavors.electron)
 
 # compare with density = 0
 osc.set_constant_density(rho_gcm3=0.0, Ye=0.5)
-P_zero = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,50), alpha=flavors.muon, beta=flavors.electron)
+P_zero = osc.probability(L_km=295, E_GeV=np.linspace(0.2,2,50), flavor_emit=flavors.muon, flavor_det=flavors.electron)
 
 # should be equal
 np.testing.assert_allclose(P_vac, P_zero, atol=1e-12)
@@ -40,14 +40,14 @@ E = np.linspace(0.2, 5.0, 600) # GeV
 
 # --- Vacuum probabilities ---
 osc.use_vacuum()
-P_mue_vac = osc.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0)   # νμ→νe
+P_mue_vac = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)   # νμ→νe
 
 # --- Constant-density matter probabilities ---
 osc.set_constant_density(rho_gcm3=rho_gcm3, Ye=Ye)
-P_mue_matt = osc.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0)
+P_mue_matt = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)
 
 # --- (optional) antineutrinos for comparison ---
-P_muebar_matt = osc.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0, antineutrino=True)
+P_muebar_matt = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0, antineutrino=True)
 
 # --- Plot ---
 plt.figure(figsize=(7,4.2))
@@ -73,7 +73,7 @@ osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
 
 # calculate without matter effects
 osc.set_constant_density(rho_gcm3=rho_gcm3, Ye=Ye)
-P_mue_matt_inv = osc.probability(L_km=L_km, E_GeV=E, alpha=1, beta=0)
+P_mue_matt_inv = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)
 
 plt.figure(figsize=(7,4.2))
 plt.plot(E, P_mue_matt, label=r"$\nu_\mu\!\to\!\nu_e$ (matter) NO", lw=2)

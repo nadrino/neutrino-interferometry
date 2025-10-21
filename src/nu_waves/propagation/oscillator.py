@@ -70,8 +70,8 @@ class Oscillator:
 
     # ----------------------------------------------------------------------
     def probability(self,
-                    alpha = None,
-                    beta = None,
+                    flavor_emit = None,
+                    flavor_det = None,
                     L_km = 0.0,
                     E_GeV = 1.0,
                     antineutrino: bool = False
@@ -176,13 +176,13 @@ class Oscillator:
             return int(x) if x.ndim == 0 else x
 
         N = P.shape[-1]
-        a = _as_idx(alpha, N)
-        b = _as_idx(beta,  N)
+        a = _as_idx(flavor_emit, N)
+        b = _as_idx(flavor_det, N)
 
         is_torch = hasattr(self.backend.xp, "device") and str(type(self.backend.xp)).startswith(
             "<class 'nu_waves.backends.torch_backend._TorchXP'")
 
-        if alpha is None and beta is None:
+        if flavor_emit is None and flavor_det is None:
             return self.backend.from_device(P)
 
         a_scalar = xp.isscalar(a)

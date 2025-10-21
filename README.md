@@ -69,8 +69,8 @@ L_list = np.linspace(L_min, L_max, 200)
 print(L_list)
 P = osc.probability(
     L_km=L_list, E_GeV=E_fixed,
-    alpha=flavors.electron,
-    beta=flavors.electron,  # muon could be sterile
+    flavor_emit=flavors.electron,
+    flavor_det=flavors.electron,  # muon could be sterile
     antineutrino=True
 )
 

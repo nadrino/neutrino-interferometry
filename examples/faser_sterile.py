@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
-from nu_waves.backends.torch_backend import make_torch_mps_backend
+from nu_waves.backends.torch_backend import make_torch_backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
 # toggle GPU
 # torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 nBins_E = 100
 nSamples_E = 1000
@@ -50,8 +50,8 @@ osc.energy_sampler = energy_sampler_sqrt
 osc.n_samples = nSamples_E
 P_mumu = osc.probability(
     L_km=fixed_L, E_GeV=E_GeV_list,
-    alpha=flavors.muon,
-    beta=flavors.muon, # muon could be sterile
+    flavor_emit=flavors.muon,
+    flavor_det=flavors.muon, # muon could be sterile
     antineutrino=False
 )
 

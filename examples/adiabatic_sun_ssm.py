@@ -4,7 +4,7 @@ import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
 
-from nu_waves.backends import make_torch_mps_backend
+from nu_waves.backends import make_torch_backend
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
@@ -13,7 +13,7 @@ import nu_waves.utils.style
 
 # toggle for CPU/GPU
 # torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 URL = "https://www.sns.ias.edu/~jnb/SNdata/Export/BS2005/bs05_agsop.dat"
 DATA_DIR = Path("./data/ssm")
