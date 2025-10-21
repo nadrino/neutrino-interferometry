@@ -23,7 +23,8 @@ class Oscillator:
                  energy_sampler=None,
                  baseline_sampler=None,
                  n_samples=100,
-                 backend=None
+                 backend=None,
+                 use_exponentiation=False, # slower
                  ):
         self.backend = backend or make_numpy_backend()
 
@@ -31,6 +32,8 @@ class Oscillator:
         self.m2_list = m2_list
         self.hamiltonian = None
         self.set_parameters(mixing_matrix=mixing_matrix, m2_list=m2_list)
+
+        self.use_exponentiation = use_exponentiation
 
         # samplers: callable(center_array, n_samples)
         self.energy_sampler = energy_sampler
@@ -124,7 +127,7 @@ class Oscillator:
 
                 H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
                 HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
-                if is_torch:
+                if self.use_exponentiation:
                     # slower
                     S = linalg.matrix_exp((-1j) * HL)
                 else:
@@ -163,7 +166,7 @@ class Oscillator:
                     )  # (B,N,N)
                     HLk = Hk * (dL_list[k] * KM)[:, xp.newaxis, xp.newaxis]
 
-                    if is_torch:
+                    if self.use_exponentiation:
                         # slower
                         Sk = linalg.matrix_exp((-1j) * HLk)
                     else:
@@ -174,7 +177,7 @@ class Oscillator:
 
                     S = Sk @ S  # pre-multiply: S_tot = S_k * S_tot
         else:
-            if is_torch and False:
+            if self.use_exponentiation:
                 # exponentiation is much slower
                 H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)
                 HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
