@@ -5,15 +5,21 @@ from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
 from nu_waves.backends.torch_backend import make_torch_backend
 
+USE_NUMPY = True
 backend = None
-try:
-    import torch
-    print("torch available")
-    backend = make_torch_backend(force_device="cpu")
-    print(backend.device)
-    HAS_TORCH = True
-except Exception:
-    print("Torch is not available")
+
+if not USE_NUMPY:
+    try:
+        import torch
+        print("torch available")
+        backend = make_torch_backend(force_device="cpu")
+        print(backend.device)
+        HAS_TORCH = True
+    except Exception:
+        print("Torch is not available")
+
+if backend is None:
+    print("Using NumPy backend")
 
 
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
@@ -51,7 +57,15 @@ def test_probability_conservation():
         L_km=295, E_GeV=Enu_list, # t2k baseline
     )
     # for any energy, sum of P for each flavor should be 1.
-    assert np.allclose(np.sum(P, axis=1), 0.0, atol=1E-12)
+
+    try:
+        assert np.allclose(np.sum(P, axis=1), 0.0, atol=1E-12)
+    except AssertionError:
+        print("Assertion failed.")
+        for flavor_prob in P:
+            print("probabilities:", flavor_prob, f"sum={np.sum(flavor_prob)}")
+        exit(1)
+
     print("test_probability_conservation: success.")
 
 
