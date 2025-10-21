@@ -21,21 +21,6 @@ def plot_phase_space(model, source: SolarSource, outdir="figures"):
     plt.tight_layout()
     plt.show()
 
-    def describe_radial(model, source):
-        r = np.linspace(0, R_SUN, 2000)
-        fr = model.radial_pdf(source, r)
-        fr /= np.trapz(fr, r)
-        peak_x = (r[np.argmax(fr)] / R_SUN)
-        cdf = np.cumsum(fr);
-        cdf /= cdf[-1]
-        r90 = r[np.searchsorted(cdf, 0.90)] / R_SUN
-        print(f"[{source.value}] peak at r/Rsun ≈ {peak_x:.3f}, 90% within r/Rsun ≈ {r90:.3f}")
-
-    # call this in main():
-    describe_radial(model, SolarSource.B8)
-    describe_radial(model, SolarSource.BE7)
-    describe_radial(model, SolarSource.PP)
-
     # 1D marginals
     r = np.linspace(0, R_SUN, 1000)
     fr = model.radial_pdf(source, r)
@@ -43,7 +28,7 @@ def plot_phase_space(model, source: SolarSource, outdir="figures"):
     fE = model.spectrum_pdf(source, Egrid)
 
     plt.figure(figsize=(6.5, 4.0))
-    plt.plot(r / R_SUN, fr / np.trapz(fr, r), label="radial pdf")
+    plt.plot(r / R_SUN, fr / np.trapezoid(fr, r), label="radial pdf")
     plt.xlabel(r"$r/R_\odot$")
     plt.ylabel("pdf")
     plt.title(f"{source.value} radial production pdf")
@@ -52,7 +37,7 @@ def plot_phase_space(model, source: SolarSource, outdir="figures"):
     plt.show()
 
     plt.figure(figsize=(6.5, 4.0))
-    plt.plot(Egrid, fE / np.trapz(fE, Egrid), label="energy pdf")
+    plt.plot(Egrid, fE / np.trapezoid(fE, Egrid), label="energy pdf")
     plt.xlabel(r"$E_\nu$ [MeV]")
     plt.ylabel("pdf")
     plt.title(f"{source.value} energy spectrum (shape only)")
@@ -66,7 +51,7 @@ def plot_multi_radial(model, sources, outdir="figures"):
     plt.figure(figsize=(6.8, 4.2))
     for s in sources:
         fr = model.radial_pdf(s, r)
-        fr /= np.trapz(fr, r)
+        fr /= np.trapezoid(fr, r)
         plt.plot(r / R_SUN, fr, label=s.value)
     plt.xlabel(r"$r/R_\odot$")
     plt.ylabel("pdf")
@@ -75,12 +60,31 @@ def plot_multi_radial(model, sources, outdir="figures"):
     plt.tight_layout()
     plt.show()
 
+
+def describe_radial(model, source):
+    r = np.linspace(0, R_SUN, 2000)
+    fr = model.radial_pdf(source, r)
+    fr /= np.trapezoid(fr, r)
+    peak_x = (r[np.argmax(fr)] / R_SUN)
+    cdf = np.cumsum(fr);
+    cdf /= cdf[-1]
+    r90 = r[np.searchsorted(cdf, 0.90)] / R_SUN
+    print(f"[{source.value}] peak at r/Rsun ≈ {peak_x:.3f}, 90% within r/Rsun ≈ {r90:.3f}")
+
+
 def main():
     model = SolarModel.standard_model()
+
+    describe_radial(model, SolarSource.B8)
+    describe_radial(model, SolarSource.BE7)
+    describe_radial(model, SolarSource.PP)
+
     # Focus first on B8 for the later upturn study
     plot_phase_space(model, SolarSource.B8)
+    # plot_phase_space(model, SolarSource.BE7)
     # Helpful comparisons
     plot_multi_radial(model, [SolarSource.PP, SolarSource.BE7, SolarSource.B8, SolarSource.PEP])
+
 
 if __name__ == "__main__":
     main()

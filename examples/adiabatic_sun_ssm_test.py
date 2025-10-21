@@ -1,4 +1,3 @@
-# examples/solar_mass_fractions_bs05.py
 import os
 from pathlib import Path
 import urllib.request
@@ -17,7 +16,7 @@ import nu_waves.utils.style
 torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
 
 URL = "https://www.sns.ias.edu/~jnb/SNdata/Export/BS2005/bs05_agsop.dat"
-DATA_DIR = Path("./")
+DATA_DIR = Path("./data/ssm")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOCAL = DATA_DIR / "bs05_agsop.dat"
 
@@ -45,7 +44,7 @@ osc = Oscillator(
 )
 
 # 4) Physics knobs
-E_GeV   = 0.003                      # 10 MeV
+E_GeV   = 0.008                      # 10 MeV
 r_emit  = 0.05 * sol.R_sun_km        # emission radius
 # distances from emission to the surface; include 0 for marker
 s_max   = sol.R_sun_km - r_emit
