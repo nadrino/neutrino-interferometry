@@ -78,6 +78,7 @@ class Oscillator:
                     ):
         xp = self.backend.xp
         linalg = self.backend.linalg
+        is_torch = self.backend.name == "torch"
 
         # ---------- normalize inputs & detect grid/pairs ----------
         L_in = xp.asarray(L_km, dtype=self.backend.dtype_real)
@@ -120,9 +121,20 @@ class Oscillator:
             if getattr(self, "_matter_profile", None) is None:
                 # constant matter density
                 rho, Ye = self._matter_args  # set via helper
+
                 H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
                 HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
-                S = linalg.matrix_exp((-1j) * HL)
+                if is_torch:
+                    # slower
+                    S = linalg.matrix_exp((-1j) * HL)
+                else:
+                    # HL is Hermitian (H Hermitian, scalar L). Use batched eigh:
+                    evals, evecs = np.linalg.eigh(HL)  # (B,N), (B,N,N)
+                    phases = np.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)  # (B,N)
+                    # S = evecs @ diag(phases) @ evecs^\dagger, fully vectorized:
+                    S = evecs * phases[:, np.newaxis, :]  # (B,N,N)
+                    S = S @ np.conjugate(evecs).transpose(0, 2, 1)  # (B,N,N)
+
             else:
                 # layered profile
                 prof = self._matter_profile
@@ -142,17 +154,43 @@ class Oscillator:
                 # S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()  # (B,N,N) identities
 
                 for k, layer in enumerate(prof.layers):
-                    Hk = self.hamiltonian.matter_constant(E_flat,
-                                                          rho_gcm3=layer.rho_gcm3,
-                                                          Ye=layer.Ye,
-                                                          antineutrino=antineutrino)  # (B,N,N)
-                    HLk = Hk * (dL_list[k] * KM)[:, xp.newaxis, xp.newaxis]  # (B,N,N)
-                    Sk = linalg.matrix_exp((-1j) * HLk)  # (B,N,N)
+
+                    Hk = self.hamiltonian.matter_constant(
+                        E_flat,
+                        rho_gcm3=layer.rho_gcm3,
+                        Ye=layer.Ye,
+                        antineutrino=antineutrino
+                    )  # (B,N,N)
+                    HLk = Hk * (dL_list[k] * KM)[:, xp.newaxis, xp.newaxis]
+
+                    if is_torch:
+                        # slower
+                        Sk = linalg.matrix_exp((-1j) * HLk)
+                    else:
+                        evals, evecs = np.linalg.eigh(HLk)
+                        phases = np.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)  # (B,N)
+                        Sk = evecs * phases[:, np.newaxis, :]
+                        Sk = Sk @ np.conjugate(evecs).transpose(0, 2, 1)  # (B,N,N)
+
                     S = Sk @ S  # pre-multiply: S_tot = S_k * S_tot
         else:
-            H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino) # (S*ns,N,N)
-            HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
-            S = linalg.matrix_exp((-1j) * HL)
+            if is_torch:
+                # generic slow path (Torch or SciPy backend)
+                H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)
+                HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
+                S = linalg.matrix_exp((-1j) * HL)
+            else:
+                # --- VACUUM FAST PATH (NumPy) ---
+                # S = U diag(exp(-i * m2 * L/E * const)) U^\dagger
+                U = np.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)  # (N,N)
+                # Expect mass-squared as a length-N array on the Hamiltonian; if not available, fall back to H+eigh
+                m2 = np.asarray(self.hamiltonian.m2_diag, dtype=self.backend.dtype_real)  # (N,)
+                phase = (KM * L_flat / E_flat)[:, None] * m2[None, :]  # (B,N)
+                phases = np.exp((-1j) * phase).astype(self.backend.dtype_complex, copy=False)  # (B,N)
+
+                Uc = np.conjugate(U).T  # (N,N)
+                U_phase = U[np.newaxis, :, :] * phases[:, np.newaxis, :]  # (B,N,N)
+                S = U_phase @ Uc  # (B,N,N)
 
         if not use_sampling:
             # using true
@@ -179,9 +217,6 @@ class Oscillator:
         a = _as_idx(flavor_emit, N)
         b = _as_idx(flavor_det, N)
 
-        is_torch = hasattr(self.backend.xp, "device") and str(type(self.backend.xp)).startswith(
-            "<class 'nu_waves.backends.torch_backend._TorchXP'")
-
         if flavor_emit is None and flavor_det is None:
             return self.backend.from_device(P)
 
@@ -190,23 +225,20 @@ class Oscillator:
 
         if not is_torch:
             # NumPy path (unchanged)
-            if a_scalar and b_scalar:       return self.backend.from_device(P[..., b, a])
-            if a_scalar and not b_scalar:   return self.backend.from_device(P[..., b, a])
-            if not a_scalar and b_scalar:   return self.backend.from_device(P[..., b, a])
-            return self.backend.from_device(P[..., self.backend.xp.ix_(b, a)])
+            out = P[..., b, a] if (a_scalar and b_scalar) or (a_scalar and not b_scalar) or (not a_scalar and b_scalar) else P[..., self.backend.xp.ix_(b, a)]
         else:
             # Torch path uses index_select (advanced indexing parity)
-            import torch
             to_idx = lambda x: xp.asarray(x, int)
             if a_scalar and b_scalar:
-                return self.backend.from_device(P[..., int(b), int(a)])
-            if a_scalar and not b_scalar:
-                return self.backend.from_device(P.index_select(-2, to_idx(b))[..., int(a)])
-            if not a_scalar and b_scalar:
-                return self.backend.from_device(P.index_select(-1, to_idx(a)).index_select(-2, to_idx(b)))
-            # both arrays
-            P_sel = self.backend.from_device(P.index_select(-2, to_idx(b)).index_select(-1, to_idx(a)))  # (..., len(b), len(a))
-            return P_sel
+                out = P[..., int(b), int(a)]
+            elif a_scalar and not b_scalar:
+                out = P.index_select(-2, to_idx(b))[..., int(a)]
+            elif not a_scalar and b_scalar:
+                out = P.index_select(-1, to_idx(a)).index_select(-2, to_idx(b))
+            else:
+                out = P.index_select(-2, to_idx(b)).index_select(-1, to_idx(a))
+
+        return self.backend.from_device(out)
 
     def adiabatic_mass_fractions(
           self,
