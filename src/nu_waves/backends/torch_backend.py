@@ -160,17 +160,8 @@ class _TorchXP:
     def abs(self, x):
         return torch.abs(x)
 
-    def conj(self, x):
-        return torch.conj(x)
-
     def conjugate(self, x):
         return torch.conj(x)
-
-    def exp(self, x):
-        return torch.exp(x)
-
-    def einsum(self, subs, *ops):
-        return torch.einsum(subs, *ops)
 
     def zeros(self, shape, dtype=None):
         dt = _map_dtype_torch(dtype, self.dtype_real, self.dtype_complex)
@@ -226,6 +217,10 @@ class _TorchLinalg:
         return w, V
 
     def matrix_exp(self, A):
+        try:
+            return torch.linalg.matrix_exp(A)
+        except NotImplementedError:
+            pass
         """
         Use CPU fallback in float64/complex128 for numerical stability
         and MPS compatibility; cast result back to original device/dtype.

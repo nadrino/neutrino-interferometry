@@ -299,7 +299,9 @@ class Oscillator:
 
         if not self._use_matter:
             V = xp.asarray(self.hamiltonian.U, dtype=dtype_c)  # (nF,nF)
-            a = xp.einsum("b...f,fi->b...i", psi, xp.conjugate(V))
+            # HOT FIX FOR MPS. .conjugate() is a lazy view, which flips the sign of a...
+            Vc = xp.conjugate(V).resolve_conj().contiguous()
+            a = xp.einsum("b...f,fi->b...i", psi, Vc)
             return a, V
 
         assert E is not None
@@ -316,7 +318,6 @@ class Oscillator:
     def _probability_split_adiabatic(self, L, E, flavor_emit=None, flavor_det=None, antineutrino=False):
         xp = self.backend.xp
 
-        # ---- your core stays the same ----
         psi0 = self._generate_initial_state(flavor_emit=flavor_emit, E=E, antineutrino=antineutrino)
         psi = self._propagate_state(psi=psi0, L=L, E=E, antineutrino=antineutrino)
         a, V = self._project_state(
@@ -334,7 +335,7 @@ class Oscillator:
         P_total = xp.abs(A) ** 2  # (nE, nFe, nFd)
         return {
             "total": P_total,
-            # Optional detailed pieces if you still want them:
+            # Optional detailed pieces:
             # "incoherent":   self.backend.from_device(xp.einsum("bkj,bej->bek", xp.abs(Vb)**2, xp.abs(a)**2)),
             # "interference": self.backend.from_device(P_total - previous_line),
         }

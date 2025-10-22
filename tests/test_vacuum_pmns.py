@@ -101,30 +101,10 @@ def test_probability_conservation():
         for iE, flavor_prob in enumerate(P):
             print(f"E({Enu_list[iE]:.3f} GeV):", flavor_prob, f"sum={np.sum(flavor_prob)}")
         print("Assertion failed.")
-        # exit(1)
-
-    from matplotlib import pyplot as plt
-    plt.figure(figsize=(6.5, 4.0))
-
-    plt.plot(Enu_list, P[:, electron], label=r"$P_{\mu e}$ appearance", lw=2)
-    plt.plot(Enu_list, P[:, muon], label=r"$P_{\mu\mu}$ disappearance", lw=2)
-    plt.plot(Enu_list, P[:, tau], label=r"$P_{\mu\tau}$ appearance", lw=2)
-    plt.plot(Enu_list, P.sum(axis=1), "--", label="Total probability", lw=1.5)
-
-    plt.xlabel(r"$E_\nu$ [GeV]")
-    plt.ylabel(r"Probability")
-    plt.title(r"test")
-    plt.xlim(E_min, E_max)
-    plt.ylim(0, 1.05)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
 
     print("test_probability_conservation: success.")
 
 
-test_probability_conservation()
-exit(0)
 test_syntax()
 test_zero_baseline_identity()
 test_probability_conservation()

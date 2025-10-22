@@ -60,8 +60,8 @@ class _NumpyXP:
     # def exp(self, x):
     #     return np.exp(x)
 
-    def einsum(self, subs, *ops):
-        return np.einsum(subs, *ops)
+    # def einsum(self, subs, *ops):
+    #     return np.einsum(subs, *ops)
 
 
 class _NumpyLinalg:
