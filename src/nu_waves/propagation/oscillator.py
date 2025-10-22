@@ -91,7 +91,6 @@ class Oscillator:
         L, E = self._generate_L_and_E_arrays(L_km, E_GeV)
         flavor_emit = self._format_flavor_arg(flavor_emit)
         flavor_det = self._format_flavor_arg(flavor_det)
-        print(f"L={L}, E={E}, flavor_emit={flavor_emit}, flavor_det={flavor_det}")
         out = self._probability(
             L=L, E=E,
             flavor_emit=flavor_emit,
@@ -340,19 +339,15 @@ class Oscillator:
 
         # ---- your core stays the same ----
         psi0 = self._generate_initial_state(flavor_emit=flavor_emit, E=E, antineutrino=antineutrino)
-        print(f"psi0={psi0}")
+        # print(f"psi0={psi0}")
         psi = self._propagate_state(psi=psi0, L=L, E=E, antineutrino=antineutrino)
-        print(f"psi={psi}")
+        # print(f"psi={psi}")
         a, V = self._project_state(
             psi=psi,
             E=E if self._use_matter else None,
             antineutrino=antineutrino if self._use_matter else None
         )
-        print(f"a={a}, V={V}")
-
-        # a: (nE, nFe, nF)
-        nE, nFe, nF = a.shape
-        nFd = len(flavor_det)
+        # print(f"a={a}, V={V}")
 
         # Detector projectors and amplitude sum over mass index j
         if xp.ndim(V) == 2:  # vacuum
@@ -364,7 +359,7 @@ class Oscillator:
 
         P_total = xp.abs(A) ** 2  # (nE, nFe, nFd)
         return {
-            "total": self.backend.from_device(P_total),
+            "total": P_total,
             # Optional detailed pieces if you still want them:
             # "incoherent":   self.backend.from_device(xp.einsum("bkj,bej->bek", xp.abs(Vb)**2, xp.abs(a)**2)),
             # "interference": self.backend.from_device(P_total - previous_line),
