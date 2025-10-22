@@ -137,7 +137,7 @@ class Oscillator:
 
         # --- matter case: energy dependence ---
         E_in = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
-        if E_in.ndim == 0:
+        if xp.ndim(E_in) == 0:
             E_in = E_in.reshape(1)
 
         if getattr(self, "_matter_profile", None) is None:
@@ -203,22 +203,22 @@ class Oscillator:
         L_in = xp.asarray(L_km, dtype=self.backend.dtype_real)
         E_in = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
 
-        if L_in.ndim == 0:
+        if xp.ndim(L_in) == 0:
             L_in = L_in.reshape(1)
-        if E_in.ndim == 0:
+        if xp.ndim(E_in) == 0:
             E_in = E_in.reshape(1)
 
         # ---------- enforce pairwise semantics ----------
-        if L_in.size == 1 and E_in.size > 1:
+        if xp.size(L_in) == 1 and xp.size(E_in) > 1:
             Lc = xp.broadcast_to(L_in, E_in.shape)
             Ec = E_in
-        elif E_in.size == 1 and L_in.size > 1:
+        elif xp.size(E_in) == 1 and xp.size(L_in) > 1:
             Lc = L_in
             Ec = xp.broadcast_to(E_in, L_in.shape)
         else:
-            if L_in.size != E_in.size:
+            if xp.size(L_in) != xp.size(E_in):
                 raise ValueError(
-                    f"Length mismatch: L_km has {L_in.size}, E_GeV has {E_in.size}. "
+                    f"Length mismatch: L_km has {xp.size(L_in)}, E_GeV has {xp.size(E_in)}. "
                     "They must match for pairwise propagation."
                 )
             Lc, Ec = L_in, E_in
@@ -295,7 +295,7 @@ class Oscillator:
 
         # ---------- apply initial state(s) ----------
         psi = xp.asarray(psi, dtype=self.backend.dtype_complex)
-        if psi.ndim == 1:
+        if xp.ndim(psi) == 1:
             # single state (N,)
             psi_out = xp.einsum("bij,j->bi", S, psi)  # (B,N)
         else:
@@ -309,7 +309,7 @@ class Oscillator:
             psi_out = psi_out.reshape(*center_shape, ns, *psi_out.shape[1:]).mean(axis=-3)
 
         # ---------- squeeze scalar axes ----------
-        if L_in.size == 1 and E_in.size == 1:
+        if xp.size(L_in) == 1 and xp.size(E_in) == 1:
             psi_out = psi_out[0]
         elif psi_out.shape[0] == 1:
             psi_out = psi_out[0]
@@ -350,14 +350,14 @@ class Oscillator:
         psi_view = psi.reshape(-1, N)  # flatten leading dims only for batched multiplication
 
         # --- Apply projection ---
-        if V.ndim == 2:
+        if xp.ndim(V) == 2:
             # one global matrix (vacuum)
             a_flat = (xp.conjugate(V).T @ psi_view.T).T  # (B,N)
         else:
             # batch of matrices (one per energy)
             # we need to broadcast correctly: (nE,N,N) with psi_view (nE*nEmit,N)
             nE = V.shape[0]
-            nEmit = psi.size // (nE * N)
+            nEmit = xp.size(psi) // (nE * N)
             psi_view = psi.reshape(nE, nEmit, N)
             a_flat = xp.einsum("bij,bkj->bki", xp.conjugate(V), psi_view)  # (nE,nEmit,N)
 
@@ -390,14 +390,14 @@ class Oscillator:
         N = a.shape[-1]
         lead_shape = a.shape[:-1]
         nE = lead_shape[0]
-        nEmit = 1 if a.ndim == 2 else lead_shape[1]
+        nEmit = 1 if xp.ndim(a) == 2 else lead_shape[1]
 
         # --- Step 2: indices (keep scalar flags BEFORE list conversion) ---
         def _as_idx(x, N):
             if x is None:
                 return xp.arange(N)
             x = xp.asarray(x)
-            return int(x) if x.ndim == 0 else x
+            return int(x) if xp.ndim(x) == 0 else x
 
         a_idx_raw = _as_idx(flavor_emit, N)
         b_idx_raw = _as_idx(flavor_det, N)
@@ -408,14 +408,14 @@ class Oscillator:
         nDet = len(b_idx)
 
         # --- Step 3: build flavour projectors ---
-        if V.ndim == 2:
+        if xp.ndim(V) == 2:
             Vb = V[b_idx, :]  # (B,N)
             Vb = xp.broadcast_to(Vb, (nE, nDet, N))  # (E,B,N)
         else:
             Vb = V[:, b_idx, :]  # (E,B,N)
 
         # --- Step 4: amplitudes & probabilities ---
-        if a.ndim == 2:
+        if xp.ndim(a) == 2:
             # single emitter: a (E,N) -> A_i (E,B,N)
             A_i = Vb * a[:, None, :]  # (E,B,N)
             P_incoh = xp.sum(xp.abs(A_i) ** 2, axis=-1)  # (E,B)
@@ -468,7 +468,7 @@ class Oscillator:
         U = self.hamiltonian.U
 
         r_in = np.asarray(r_km, float)
-        if r_in.ndim != 1 or r_in.size < 2:
+        if xp.ndim(r_in) != 1 or xp.size(r_in) < 2:
             raise ValueError("r_km must be a 1D array with length ≥ 2.")
 
         # Work internally with increasing radius; remember if we reversed
@@ -478,12 +478,12 @@ class Oscillator:
         rho_np = profile.rho_gcm3(r_path)
         Ye_np = profile.Ye(r_path)
         H_list = []
-        for k in range(r_path.size):
+        for k in range(xp.size(r_path)):
             Hk = self.hamiltonian.matter_constant(
                 E_GeV, rho_gcm3=float(rho_np[k]), Ye=float(Ye_np[k]),
                 antineutrino=antineutrino
             )
-            H_list.append(Hk[0] if Hk.ndim == 3 else Hk)  # ensure (N,N)
+            H_list.append(Hk[0] if xp.ndim(Hk) == 3 else Hk)  # ensure (N,N)
 
         H = xp.stack(H_list, axis=0)  # (n,N,N)
         evals, evecs = linalg.eigh(H)  # (n,N), (n,N,N)
@@ -560,7 +560,7 @@ class Oscillator:
         rho = float(np.asarray(profile.rho_gcm3([r_emit_km]), float)[0])
         Ye = float(np.asarray(profile.Ye([r_emit_km]), float)[0])
         H = self.hamiltonian.matter_constant(E_GeV, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
-        if H.ndim == 3: H = H[0]  # (N,N)
+        if xp.ndim(H) == 3: H = H[0]  # (N,N)
 
         evals, V = self.backend.linalg.eigh(H)  # columns = |nu_j^m>
         e_alpha = xp.zeros((N,), dtype=self.backend.dtype_complex);
@@ -592,7 +592,7 @@ class Oscillator:
         Returns F with shape (n, N), aligned with s_km (i.e., with r = r_emit_km + s_km).
         """
         s = np.asarray(s_km, float)
-        if s.ndim != 1 or s.size < 2:
+        if np.ndim(s) != 1 or np.size(s) < 2:
             raise ValueError("s_km must be a 1D array with length ≥ 2.")
         if np.any(s < 0):
             raise ValueError("s_km must be non-negative.")

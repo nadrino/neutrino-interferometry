@@ -38,6 +38,34 @@ class _TorchXP:
             return getattr(torch, name)
         raise AttributeError(f"_TorchXP has no attribute {name}")
 
+    def ndim(self, x):
+        """Return number of dimensions of a Torch tensor, NumPy array, or scalar."""
+        # handle scalar / list / numpy input gracefully
+        if isinstance(x, torch.Tensor):
+            return x.ndim
+        elif hasattr(x, "ndim"):
+            return x.ndim
+        else:
+            # fallback for numbers or lists
+            try:
+                return torch.as_tensor(x).ndim
+            except Exception:
+                return 0
+
+    def size(self, x):
+        """Return total number of elements in a Torch tensor or array-like."""
+        if isinstance(x, torch.Tensor):
+            return x.numel()
+        elif hasattr(x, "size"):
+            # NumPy or other array-likes
+            val = x.size
+            return val() if callable(val) else val
+        else:
+            try:
+                return torch.as_tensor(x).numel()
+            except Exception:
+                return 1
+
     def maximum(self, x, y):
         # torch.maximum only works on tensors — make sure both are tensors
         x_t = x if isinstance(x, torch.Tensor) else torch.as_tensor(x, device=self.device)
