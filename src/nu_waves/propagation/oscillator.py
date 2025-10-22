@@ -3,6 +3,7 @@ from nu_waves.hamiltonian.base import Hamiltonian
 from nu_waves.backends import make_numpy_backend
 from nu_waves.matter.profile import MatterProfile
 from nu_waves.utils.units import KM_TO_EVINV
+from nu_waves.utils.units import GEV_TO_EV
 
 
 class Oscillator:
@@ -240,14 +241,12 @@ class Oscillator:
             E_flat = Es.reshape(-1)
             L_flat = Ls.reshape(-1)
 
-        KM = xp.asarray(KM_TO_EVINV, dtype=self.backend.dtype_real)
-
         # ---------- evolution operator ----------
-        if getattr(self, "_use_matter", False):
-            if getattr(self, "_matter_profile", None) is None:
+        if self._use_matter:
+            if self._matter_profile is None:
                 rho, Ye = self._matter_args
                 H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
-                HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
+                HL = H * (L_flat * KM_TO_EVINV)[:, xp.newaxis, xp.newaxis]
                 if self.use_exponentiation:
                     S = linalg.matrix_exp((-1j) * HL)
                 else:
@@ -268,7 +267,7 @@ class Oscillator:
                     Hk = self.hamiltonian.matter_constant(
                         E_flat, rho_gcm3=layer.rho_gcm3, Ye=layer.Ye, antineutrino=antineutrino
                     )
-                    HLk = Hk * (dL_list[k] * KM)[:, xp.newaxis, xp.newaxis]
+                    HLk = Hk * (dL_list[k] * KM_TO_EVINV)[:, xp.newaxis, xp.newaxis]
                     if self.use_exponentiation:
                         Sk = linalg.matrix_exp((-1j) * HLk)
                     else:
@@ -281,13 +280,13 @@ class Oscillator:
             # vacuum
             if self.use_exponentiation:
                 H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)
-                HL = H * (L_flat * KM)[:, xp.newaxis, xp.newaxis]
+                HL = H * (L_flat * KM_TO_EVINV)[:, xp.newaxis, xp.newaxis]
                 S = linalg.matrix_exp((-1j) * HL)
             else:
                 U = xp.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)
                 m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=self.backend.dtype_real)
-                phase = (KM * L_flat / E_flat)[:, None] * m2[None, :]
-                phases = xp.astype(xp.exp((-1j) * phase), self.backend.dtype_complex, copy=False)
+                phase = 0.5 * (KM_TO_EVINV * L_flat / (E_flat*GEV_TO_EV))[:, None] * m2[None, :]
+                phases = xp.exp((-1j) * phase)
                 Uc = xp.conjugate(U).T
                 U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]
                 S = U_phase @ Uc

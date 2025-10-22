@@ -9,8 +9,8 @@ import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
 # toggle GPU
-# torch_backend = None
-torch_backend = make_torch_backend(seed=0, use_complex64=True)
+torch_backend = None
+# torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 nBins_L = 200
 nSamples_E = 10000
@@ -82,8 +82,9 @@ def energy_sampler_sqrt(E_center, n, a=0.008):
     return out
 
 # osc.baseline_sampler = baseline_sampler_gauss
-osc.energy_sampler = energy_sampler_sqrt
-osc.n_samples = nSamples_E
+# osc.energy_sampler = energy_sampler_sqrt
+# osc.n_samples = nSamples_E
+osc.use_exponentiation = True
 P_damp = osc.probability(
     L_km=L_list, E_GeV=E_fixed,
     flavor_emit=flavors.electron,
@@ -98,8 +99,8 @@ P_damp = osc.probability(
 # ----------------------------------------------------------------------
 plt.figure(figsize=(6.5, 4.0), dpi=150)
 
-plt.plot(L_list*1000, P, label=r"$P_{e e}$ disappearance", lw=2)
-plt.plot(L_list*1000, P_damp, label=r"$P_{e e}$ disappearance (with E smearing)", lw=2)
+plt.plot(L_list*1000, P, label=r"$P_{e e}$ disappearance (no exponentiation)", lw=2)
+plt.plot(L_list*1000, P_damp, label=r"$P_{e e}$ disappearance (exponentiation)", lw=2)
 plt.plot(L_list*1000, [1]*len(L_list), "--", label="Total probability", lw=1.5)
 
 plt.xlabel(r"$L_\nu$ [m]")
