@@ -88,116 +88,331 @@ class Oscillator:
         )
 
     def probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
-        return self.backend.from_device(
-            self._probability(
-                L_km=L_km, E_GeV=E_GeV, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino
-            )
+        L, E = self._generate_L_and_E_arrays(L_km, E_GeV)
+        flavor_emit = self._format_flavor_arg(flavor_emit)
+        flavor_det = self._format_flavor_arg(flavor_det)
+        out = self._probability(
+            L=L, E=E,
+            flavor_emit=flavor_emit,
+            flavor_det=flavor_det,
+            antineutrino=antineutrino
         )
+        return self.backend.from_device(self._squeeze_array(out))
 
-    # private
-    def _generate_initial_state(self, flavor_emit, E_GeV, antineutrino=False):
+    def probability_sampled(self, L_true_km, E_true_GeV, flavor_emit=None, flavor_det=None, antineutrino=False,
+                            L_sample_fct=None, E_sample_fct=None, nSamples=100):
+        L, E = self._format_arrays(L_true_km, E_true_GeV)
+
+        # out = self._probability_sampled(L_true_km=L, E_true_GeV=E,
+        #                               flavor_emit=flavor_emit, flavor_det=flavor_det,
+        #                               antineutrino=antineutrino,
+        #                               L_sample_fct=L_sample_fct, E_sample_fct=E_sample_fct, nSamples=nSamples)
+        #
+        # return self.backend.from_device(out)
+
+    def _squeeze_array(self, x, preserve_axes=None):
         """
-        Generate the initial state(s) |psi(0)> corresponding to the chosen
-        flavor(s) in the appropriate basis (flavour or matter).
+        Remove all dims of size 1.
+        If preserve_axes is provided (int or iterable, supports negative indices),
+        those axes are kept even if they have size 1.
+        """
+        # fast path when we don't need to preserve anything
+        if preserve_axes is None or (isinstance(preserve_axes, (list, tuple)) and len(preserve_axes) == 0):
+            # NumPy and Torch both implement .squeeze()
+            return x.squeeze()
 
-        Parameters
-        ----------
-        flavor_emit : int or array-like
-            Indices of emitting flavour(s). Example: 0=e, 1=mu, 2=tau.
-        E_GeV : float or 1D array
-            Neutrino energies. Used only if matter effects are enabled.
-        antineutrino : bool
-            Use the conjugate matter Hamiltonian if True.
+        # normalize preserve set with positive indices
+        ndim = x.ndim if hasattr(x, "ndim") else x.dim()
+        if isinstance(preserve_axes, int):
+            preserve_axes = (preserve_axes,)
+        pres = set()
+        for a in preserve_axes:
+            a = int(a)
+            if a < 0:
+                a += ndim
+            if a < 0 or a >= ndim:
+                raise IndexError(f"preserve axis {a} out of range for ndim={ndim}")
+            pres.add(a)
 
-        Returns
-        -------
-        psi0 : array
-            Initial state(s), complex array with shape:
-              - (N,)              for a single flavour
-              - (nEmit, N)        for multiple flavours
-              - (nE, N) or (nE, nEmit, N) if matter effects cause energy dependence
+        # build new shape (keep any non-1 dims or preserved axes)
+        shape = [int(s) for s in x.shape]
+        new_shape = [s for i, s in enumerate(shape) if (s != 1) or (i in pres)]
+
+        # if everything would be squeezed, return a scalar (0-d)
+        if len(new_shape) == 0:
+            return x.reshape(())
+
+        # reshape is metadata-only in NumPy, and in Torch returns a view if possible
+        return x.reshape(new_shape)
+
+    def _format_flavor_arg(self, arg):
+        """
+        Normalize to list[int].
+        Allowed: None → full range [0..n_flavors-1], int, list[int].
+        Disallowed: anything else.
         """
         xp = self.backend.xp
-        N = self.hamiltonian.U.shape[0]
+        if arg is None:
+            return list(range(int(self.hamiltonian.n_flavors)))
 
-        # ---------- normalize indices ----------
-        a_idx = xp.as_idx(flavor_emit, N)
-        a_scalar = xp.isscalar(a_idx)
-        if a_scalar:
-            a_idx = [a_idx]
+        if isinstance(arg, int):
+            out = [int(arg)]
+        elif isinstance(arg, list) and all(isinstance(x, int) for x in arg):
+            out = [int(x) for x in arg]
+        else:
+            raise TypeError(f"Flavor arg must be None, int, or list of int.")
 
-        # ---------- vacuum or matter basis ----------
-        if not getattr(self, "_use_matter", False):
-            # --- simple flavour basis ---
-            psi0 = xp.zeros((len(a_idx), N), dtype=self.backend.dtype_complex)
-            psi0[xp.arange(len(a_idx)), xp.asarray(a_idx, int)] = 1.0
-            if len(a_idx) == 1:
-                psi0 = psi0[0]  # (N,)
-            return self.backend.from_device(psi0)
+        return out
 
-        # --- matter case: energy dependence ---
-        E_in = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
-        if xp.ndim(E_in) == 0:
-            E_in = E_in.reshape(1)
+    def _format_arrays(self, L_km, E_GeV):
+        """
+        Accept scalars or 1D arrays (Torch or NumPy).
+        Returns L_vec, E_vec shaped (N,), with broadcasting if one is scalar.
+        """
+        xp = self.backend.xp
+        L = xp.as_real(L_km)
+        E = xp.as_real(E_GeV)
 
+        # Convert all in eV
+        L = L * KM_TO_EVINV
+        E = E * GEV_TO_EV
+
+        nL = xp.ndim(L)
+        nE = xp.ndim(E)
+
+        # Promote scalars to vectors where needed
+        if nL == 0 and nE == 0:
+            L = L.reshape(1)
+            E = E.reshape(1)
+        elif nL == 0 and nE == 1:
+            L = xp.ones_like(E) * L
+        elif nL == 1 and nE == 0:
+            E = xp.ones_like(L) * E
+        elif nL == 1 and nE == 1:
+            if L.shape != E.shape:
+                raise ValueError(f"L and E must have the same length; got {L.shape} vs {E.shape}.")
+        else:
+            raise ValueError("L_km and E_GeV must be scalar or 1D.")
+
+        # Ensure contiguous 1D vectors
+        L = L.reshape(-1)
+        E = E.reshape(-1)
+        return L, E
+
+    def _generate_initial_state(self, flavor_emit, E, antineutrino=False):
+        """
+        PRIVATE core.
+        Inputs (assumed valid; no checks performed):
+          - E: xp 1D array with shape (nE,), energies in eV.
+          - flavor_emit: xp 1D array with shape (nF,), flavour-basis amplitudes
+                         (e.g. one-hot for a pure flavour).
+        Output:
+          - psi0: xp complex array with shape (nE, nF).
+            In vacuum mode:      flavour-basis, tiled over energies.
+            In matter mode:      matter-eigenbasis projection V(E)^\\dagger * flavor_emit.
+        """
+        xp = self.backend.xp
+        dtype_c = self.backend.dtype_complex
+        N = self.hamiltonian.n_flavors  # nF
+        nE = E.shape[0]
+
+        # Coerce list -> backend array with complex dtype
+        a_f = xp.asarray(flavor_emit, dtype=dtype_c)  # (nF,)
+
+        if not self._use_matter:
+            # Vacuum: psi0 is flavour-basis and identical for all energies
+            # (nE,1) * (1,nF) -> (nE,nF)
+            psi0 = xp.ones((nE, 1), dtype=dtype_c) * a_f[xp.newaxis, :]
+            return psi0
+
+        # Matter: use first-layer (production) density or constant-density args
         if getattr(self, "_matter_profile", None) is None:
             rho, Ye = self._matter_args
-            H = self.hamiltonian.matter_constant(E_in, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
-            evals, V_np = np.linalg.eigh(self.backend.from_device(H))
-            V = xp.asarray(V_np, dtype=self.backend.dtype_complex)  # (nE,N,N)
         else:
-            # use density of first (production) layer
             layer = self._matter_profile.layers[0]
             rho, Ye = layer.rho_gcm3, layer.Ye
-            H = self.hamiltonian.matter_constant(E_in, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
-            evals, V_np = np.linalg.eigh(self.backend.from_device(H))
-            V = xp.asarray(V_np, dtype=self.backend.dtype_complex)
 
-        # ---------- project flavour states into matter basis ----------
-        # V transforms mass→flavour, so its conjugate columns correspond to flavour→mass
-        Vc = xp.conjugate(V)
+        # H(E) diagonalization on CPU, then back to backend
+        H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)  # (nE,N,N)
+        import numpy as np
+        _, V_np = np.linalg.eigh(self.backend.from_device(H))  # V_np: (nE,N,N), mass->flavour
+        V = xp.asarray(V_np, dtype=dtype_c)
 
-        if V.ndim == 2:
-            # single energy
-            psi0 = Vc[:, a_idx]  # (N, nEmit)
-            psi0 = xp.moveaxis(psi0, -1, 0)  # (nEmit, N)
-        else:
-            # multiple energies: (nE,N,N)
-            psi0 = Vc[:, :, a_idx]  # (nE,N,nEmit)
-            psi0 = xp.moveaxis(psi0, -1, -2)  # (nE,nEmit,N)
+        # psi0(E) = V(E)^\dagger * a_f  -> (nE,N,N) @ (N,1) -> (nE,N,1) -> (nE,N)
+        a_col = a_f.reshape(N, 1)
+        psi0 = (xp.conjugate(V) @ a_col)[..., 0]
+        return psi0
 
-        # --- squeeze scalar axes for consistency ---
-        if psi0.shape[0] == 1 and psi0.ndim == 3:
-            psi0 = psi0[0]
-        if psi0.ndim == 2 and psi0.shape[0] == 1:
-            psi0 = psi0[0]
-
-        return self.backend.from_device(psi0)
-
-    def _propagate_state(self, psi, L_km, E_GeV, antineutrino=False):
+    def _propagate_state(self, psi, L, E, antineutrino=False):
         """
-        Return psi(L) = S(L,E) @ psi(0)
-
-        Parameters
-        ----------
-        psi : array-like
-            Initial state(s) in flavour basis. Can be:
-              - shape (N,)             for a single state
-              - shape (..., N)         for multiple states (e.g. (nEmit, N))
-        L_km, E_GeV : float or 1D array
-            Baseline(s) and energy(ies). Pairwise semantics: if both are arrays,
-            their lengths must match.
-        antineutrino : bool
-            Use conjugate Hamiltonian if True.
-
-        Returns
-        -------
-        psi_out : array
-            Propagated state(s) in flavour basis, with shape
-              (..., N) or (..., nEmit, N), matching psi and inputs.
+        PRIVATE core.
+        Assumptions (no checks):
+          - psi: xp complex array, shape (nE, nF)  [flavour basis at x=0]
+          - L:   xp real array,   shape (nE,)      [in eV^-1]
+          - E:   xp real array,   shape (nE,)      [in eV]
+        Returns:
+          - psi_out: xp complex array, shape (nE, nF)  [flavour basis at x=L]
         """
         xp = self.backend.xp
         linalg = self.backend.linalg
+        dtype_c = self.backend.dtype_complex
+        dtype_r = self.backend.dtype_real
+
+        # ---------- evolution operator S (nE, nF, nF) ----------
+        if self._use_matter:
+            if self._matter_profile is None:
+                # constant-density MSW
+                rho, Ye = self._matter_args
+                H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)  # (nE,nF,nF)
+                HL = H * L[:, xp.newaxis, xp.newaxis]  # (nE,nF,nF)
+                if self.use_exponentiation:
+                    S = linalg.matrix_exp((-1j) * HL)  # (nE,nF,nF)
+                else:
+                    evals, evecs = xp.linalg.eigh(HL)  # HL = V diag(e) V^†
+                    phases = xp.exp((-1j) * evals)  # (nE,nF)
+                    S = (evecs * phases[:, xp.newaxis, :]) @ xp.conjugate(evecs).transpose(0, 2, 1)  # (nE,nF,nF)
+            else:
+                # layered matter profile; dL_list[k] is (nE,) and in the SAME UNITS as L (eV^-1)
+                prof = self._matter_profile
+                dL_list = prof.resolve_dL(L)  # assumed (list of xp arrays) with shape (nE,)
+                nF = self.hamiltonian.U.shape[0]
+                S = xp.eye(nF, dtype=dtype_c)[xp.newaxis, ...]
+                S = xp.broadcast_to(S, (E.shape[0], nF, nF)).copy()
+                for k, layer in enumerate(prof.layers):
+                    Hk = self.hamiltonian.matter_constant(E, rho_gcm3=layer.rho_gcm3, Ye=layer.Ye,
+                                                          antineutrino=antineutrino)  # (nE,nF,nF)
+                    HLk = Hk * dL_list[k][:, xp.newaxis, xp.newaxis]  # (nE,nF,nF)
+                    if self.use_exponentiation:
+                        Sk = linalg.matrix_exp((-1j) * HLk)
+                    else:
+                        evals, evecs = xp.linalg.eigh(HLk)
+                        phases = xp.exp((-1j) * evals)
+                        Sk = (evecs * phases[:, xp.newaxis, :]) @ xp.conjugate(evecs).transpose(0, 2, 1)
+                    S = Sk @ S
+        else:
+            # vacuum
+            if self.use_exponentiation:
+                H = self.hamiltonian.vacuum(E, antineutrino=antineutrino)  # (nE,nF,nF)
+                HL = H * L[:, xp.newaxis, xp.newaxis]
+                S = linalg.matrix_exp((-1j) * HL)
+            else:
+                U = xp.asarray(self.hamiltonian.U, dtype=dtype_c)  # (nF,nF)
+                m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=dtype_r)  # (nF,)  [eV^2]
+                phase = 0.5 * (L / E)[:, None] * m2[None, :]  # (nE,nF)
+                phases = xp.exp((-1j) * phase)  # (nE,nF)
+                Uc = xp.conjugate(U).T
+                U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]  # (nE,nF,nF)
+                S = U_phase @ Uc  # (nE,nF,nF)
+
+        # ---------- apply initial state(s): psi_out(b,i) = sum_j S(b,i,j) psi(b,j) ----------
+        psi = xp.asarray(psi, dtype=dtype_c)  # (nE,nF)
+        psi_out = xp.einsum("bij,bj->bi", S, psi)  # (nE,nF)
+        return psi_out
+
+    def _project_state(self, psi, E=None, antineutrino=False):
+        """
+        PRIVATE core.
+        Assumptions:
+          - psi: xp complex array, shape (nE, nF) in flavour basis
+          - E:   xp real array,   shape (nE,) in eV (used only if self._use_matter)
+        Returns:
+          - a: xp complex array, shape (nE, nF)  [mass/matter amplitudes]
+          - V: eigenvector matrix U_m (vacuum: (nF,nF); matter: (nE,nF,nF))
+               (V maps mass->flavour; projection uses V^†)
+        """
+        xp = self.backend.xp
+        dtype_c = self.backend.dtype_complex
+
+        if not self._use_matter:
+            # Vacuum: single mixing matrix
+            V = xp.asarray(self.hamiltonian.U, dtype=dtype_c)  # (nF, nF)
+            a = psi @ xp.conjugate(V)  # (nE, nF), since V^† right-multiplies rows
+            return a, V
+
+        # Matter: use last-layer density (detection layer) or constant-density args
+        if getattr(self, "_matter_profile", None) is None:
+            rho, Ye = self._matter_args
+        else:
+            layer = self._matter_profile.layers[-1]
+            rho, Ye = layer.rho_gcm3, layer.Ye
+
+        H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)  # (nE,nF,nF)
+
+        import numpy as np
+        _, V_np = np.linalg.eigh(self.backend.from_device(H))  # CPU eigvecs, (nE,nF,nF)
+        V = xp.asarray(V_np, dtype=dtype_c)
+
+        # Row-wise projection: a_b = psi_b @ V_b^†
+        a = xp.einsum("bi,bij->bj", psi, xp.conjugate(V))  # (nE, nF)
+        return a, V
+
+    def _probability_split_adiabatic(self, L, E, flavor_emit=None, flavor_det=None, antineutrino=False):
+        xp = self.backend.xp
+        nF = self.hamiltonian.n_flavors
+        nE = E.shape[0]
+        nFe = len(flavor_emit)
+        nFd = len(flavor_det)
+
+        # --- Step 1: propagate and project onto mass basis ---
+        psi0 = self._generate_initial_state(flavor_emit=flavor_emit, E=E, antineutrino=antineutrino)
+        print(f"psi0 = {psi0}")
+        psi = self._propagate_state(psi=psi0, L=L, E=E, antineutrino=antineutrino)
+        print(f"psi = {psi}")
+        a, V = self._project_state(
+            psi=psi,
+            E=E if self._use_matter else None,
+            antineutrino=antineutrino if self._use_matter else None
+        )
+        print(f"V.shape = {V.shape}")
+        print(f"V = {V}")
+        print(f"a.shape = {a.shape}")
+        print(f"a = {a}")
+
+        # a: (nE, nFe)
+        # V: (nFe, nFe) [vacuum] or (nE, nFe, nFe) [matter]
+        xp = self.backend.xp
+        nE, nFe = a.shape
+        nFd = len(flavor_det)
+
+        # Build V_{beta i} with detector as last axis -> (nE, nFe, nFd)
+        if xp.ndim(V) == 2:
+            Vb_T = xp.asarray(V[flavor_det, :]).T  # (nFe, nFd)
+            Vb_T = xp.broadcast_to(Vb_T, (nFe, nFd))[None, ...]  # (1, nFe, nFd) -> (nE, nFe, nFd) via broadcast
+        else:
+            Vb = V[:, flavor_det, :]  # (nE, nFd, nFe)
+            Vb_T = xp.swapaxes(Vb, 1, 2)  # (nE, nFe, nFd)
+
+        # Per-eigenstate amplitudes: A_i(E, i, beta) = a_i(E) * V_{beta i}(E)
+        A_i = a[:, :, None] * Vb_T  # (nE, nFe, nFd)
+
+        # Incoherent contribution (per i): |A_i|^2
+        P_incoh_i = xp.abs(A_i) ** 2  # (nE, nFe, nFd)
+
+        # Total amplitude summed over i, then |.|^2
+        amp_tot = xp.sum(A_i, axis=1)  # (nE, nFd)
+        P_total_scalar = xp.abs(amp_tot) ** 2  # (nE, nFd)
+
+        # Broadcast totals/interference so output dims are (nE, nFe, nFd)
+        P_total = xp.broadcast_to(P_total_scalar[:, None, :], P_incoh_i.shape)
+        P_incoh_sum = xp.sum(P_incoh_i, axis=1)  # (nE, nFd)
+        P_int_scalar = P_total_scalar - P_incoh_sum  # (nE, nFd)
+        P_int = xp.broadcast_to(P_int_scalar[:, None, :], P_incoh_i.shape)
+
+        # print(f"P_total.shape = {P_total.shape}")
+        # print(f"P_total = {P_total}")
+        return {
+            "total": self.backend.from_device(P_total),  # (nE, nFe, nFd)
+            "incoherent": self.backend.from_device(P_incoh_i),  # (nE, nFe, nFd)
+            "interference": self.backend.from_device(P_int),  # (nE, nFe, nFd)
+        }
+
+    def _probability(self, L, E, flavor_emit=None, flavor_det=None, antineutrino=False):
+        return self._probability_split_adiabatic(
+            L=L, E=E, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino
+        )["total"]
+
+    def _generate_L_and_E_arrays(self, L_km, E_GeV):
+        xp = self.backend.xp
 
         # ---------- normalize inputs ----------
         L_in = xp.asarray(L_km, dtype=self.backend.dtype_real)
@@ -229,195 +444,25 @@ class Oscillator:
         E_flat = Ec.reshape(-1)
         L_flat = Lc.reshape(-1)
 
-        # ---------- evolution operator ----------
-        if self._use_matter:
-            if self._matter_profile is None:
-                rho, Ye = self._matter_args
-                H = self.hamiltonian.matter_constant(E_flat, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
-                HL = H * (L_flat * KM_TO_EVINV)[:, xp.newaxis, xp.newaxis]
-                if self.use_exponentiation:
-                    S = linalg.matrix_exp((-1j) * HL)
-                else:
-                    evals, evecs = xp.linalg.eigh(HL)
-                    phases = xp.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)
-                    S = evecs * phases[:, xp.newaxis, :]
-                    S = S @ xp.conjugate(evecs).transpose(0, 2, 1)
-            else:
-                prof = self._matter_profile
-                dL_list = prof.resolve_dL(self.backend.from_device(L_flat))
-                dL_list = [xp.asarray(dL, dtype=self.backend.dtype_real) for dL in dL_list]
+        return L_flat, E_flat
 
-                N = self.hamiltonian.U.shape[0]
-                S = xp.eye(N, dtype=self.backend.dtype_complex)[xp.newaxis, ...]
-                S = xp.broadcast_to(S, (E_flat.shape[0], N, N)).copy()
+    def _probability_sampled(self, L_true_km, E_true_GeV, flavor_emit=None, flavor_det=None, antineutrino=False, L_sample_fct=None, E_sample_fct=None, nSamples=100):
+        if L_sample_fct is None and E_sample_fct is None:
+            raise AttributeError("At least one of L_sample_fct or L_sample_fct is required")
 
-                for k, layer in enumerate(prof.layers):
-                    Hk = self.hamiltonian.matter_constant(
-                        E_flat, rho_gcm3=layer.rho_gcm3, Ye=layer.Ye, antineutrino=antineutrino
-                    )
-                    HLk = Hk * (dL_list[k] * KM_TO_EVINV)[:, xp.newaxis, xp.newaxis]
-                    if self.use_exponentiation:
-                        Sk = linalg.matrix_exp((-1j) * HLk)
-                    else:
-                        evals, evecs = xp.linalg.eigh(HLk)
-                        phases = xp.exp((-1j) * evals).astype(self.backend.dtype_complex, copy=False)
-                        Sk = evecs * phases[:, xp.newaxis, :]
-                        Sk = Sk @ xp.conjugate(evecs).transpose(0, 2, 1)
-                    S = Sk @ S
-        else:
-            # vacuum
-            if self.use_exponentiation:
-                H = self.hamiltonian.vacuum(E_flat, antineutrino=antineutrino)
-                HL = H * (L_flat * KM_TO_EVINV)[:, xp.newaxis, xp.newaxis]
-                S = linalg.matrix_exp((-1j) * HL)
-            else:
-                U = xp.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)
-                m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=self.backend.dtype_real)
-                phase = 0.5 * (KM_TO_EVINV * L_flat / (E_flat*GEV_TO_EV))[:, None] * m2[None, :]
-                phases = xp.exp((-1j) * phase)
-                Uc = xp.conjugate(U).T
-                U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]
-                S = U_phase @ Uc
-
-        # ---------- apply initial state(s) ----------
-        psi = xp.asarray(psi, dtype=self.backend.dtype_complex)
-        if xp.ndim(psi) == 1:
-            # single state (N,)
-            psi_out = xp.einsum("bij,j->bi", S, psi)  # (B,N)
-        else:
-            # multiple states (...,N)
-            psi_out = xp.einsum("bij,kj->bki", S, psi)  # (B,nPsi,N)
-
-        # ---------- reshape back ----------
-        psi_out = psi_out.reshape(*center_shape, *psi_out.shape[1:])
-
-        # ---------- squeeze scalar axes ----------
-        if xp.size(L_in) == 1 and xp.size(E_in) == 1:
-            psi_out = psi_out[0]
-        elif psi_out.shape[0] == 1:
-            psi_out = psi_out[0]
-
-        return psi_out
-
-    def _project_state(self, psi, E_GeV=None, antineutrino=None):
-        """
-        Project a propagated state psi(..., N) from flavour basis onto
-        the mass/matter eigenbasis.
-
-        psi may have arbitrary leading dimensions (e.g. (nE, nEmit, N)).
-        Returns:
-            a  : same leading shape as psi, last dim = N (mass amplitudes)
-            V  : eigenvector matrix (N,N) or batch (nE,N,N)
-        """
         xp = self.backend.xp
+        L_true_km_tensor = xp.asarray(L_true_km) if not hasattr(L_true_km, 'shape') else L_true_km
+        E_true_GeV_tensor = xp.asarray(E_true_GeV) if not hasattr(E_true_GeV, 'shape') else E_true_GeV
+        E_true_GeV_tensor = xp.broadcast_to(E_true_GeV_tensor, L_true_km_tensor.shape) if L_true_km_tensor.ndim == 1 and E_true_GeV_tensor.ndim == 0 else E_true_GeV_tensor
 
-        # choose projection matrix V (vacuum or matter)
-        if not self._use_matter:
-            V = xp.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)  # (N,N)
-        else:
-            assert E_GeV is not None, "Need E_GeV to diagonalize Hamiltonian in matter."
-            rho, Ye = (
-                self._matter_args if getattr(self, "_matter_profile", None) is None
-                else (self._matter_profile.layers[-1].rho_gcm3,
-                      self._matter_profile.layers[-1].Ye)
-            )
-            import numpy as np
-            E_arr = xp.asarray(E_GeV, dtype=self.backend.dtype_real).reshape(-1)
-            H = self.hamiltonian.matter_constant(E_arr, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
-            evals, V_np = np.linalg.eigh(self.backend.from_device(H))
-            V = xp.asarray(V_np, dtype=self.backend.dtype_complex)  # (nE,N,N)
+        L_km = ...
+        E_GeV = ...
 
-        # Determine number of flavour components
-        N = psi.shape[-1]
-        lead_shape = psi.shape[:-1]  # e.g. (10,3)
-        psi_view = psi.reshape(-1, N)  # flatten leading dims only for batched multiplication
+        P = self._probability(L=L_km, E=E_GeV, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino)
 
-        # --- Apply projection ---
-        if xp.ndim(V) == 2:
-            # one global matrix (vacuum)
-            a_flat = (xp.conjugate(V).T @ psi_view.T).T  # (B,N)
-        else:
-            # batch of matrices (one per energy)
-            # we need to broadcast correctly: (nE,N,N) with psi_view (nE*nEmit,N)
-            nE = V.shape[0]
-            nEmit = xp.size(psi) // (nE * N)
-            psi_view = psi.reshape(nE, nEmit, N)
-            a_flat = xp.einsum("bij,bkj->bki", xp.conjugate(V), psi_view)  # (nE,nEmit,N)
+        #
 
-        # --- reshape back to original leading shape ---
-        a = a_flat.reshape(*lead_shape, N)
 
-        return a, V
-
-    def _probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
-        return self._probability_split_adiabatic(
-            L_km=L_km, E_GeV=E_GeV, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino
-        )["total"]
-
-    def _probability_split_adiabatic(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
-        xp = self.backend.xp
-
-        # Convert to tensor first, then get shape
-        L_km_tensor = xp.asarray(L_km) if not hasattr(L_km, 'shape') else L_km
-        E_GeV_tensor = xp.asarray(E_GeV) if not hasattr(E_GeV, 'shape') else E_GeV
-        E_GeV = xp.broadcast_to(E_GeV_tensor, L_km_tensor.shape) if L_km_tensor.ndim == 1 and E_GeV_tensor.ndim == 0 else E_GeV_tensor
-
-        # --- Step 1: propagate and project onto mass basis ---
-        psi0 = self._generate_initial_state(flavor_emit=flavor_emit, E_GeV=E_GeV, antineutrino=antineutrino)
-        psi = self._propagate_state(psi=psi0, L_km=L_km, E_GeV=E_GeV, antineutrino=antineutrino)
-        a, V = self._project_state(
-            psi=psi,
-            E_GeV=E_GeV if self._use_matter else None,
-            antineutrino=antineutrino if self._use_matter else None
-        )
-        # a: (E,N) or (E,A,N)
-        N = a.shape[-1]
-        lead_shape = a.shape[:-1]
-        nE = lead_shape[0]
-        nEmit = 1 if xp.ndim(a) == 2 else lead_shape[1]
-
-        # --- Step 2: indices (keep scalar flags BEFORE list conversion) ---
-        a_idx_raw = xp.as_idx(flavor_emit, N)
-        b_idx_raw = xp.as_idx(flavor_det, N)
-        a_scalar_in = xp.isscalar(a_idx_raw)
-        b_scalar_in = xp.isscalar(b_idx_raw)
-        a_idx = [a_idx_raw] if a_scalar_in else a_idx_raw
-        b_idx = [b_idx_raw] if b_scalar_in else b_idx_raw
-        nDet = len(b_idx)
-
-        # --- Step 3: build flavour projectors ---
-        if xp.ndim(V) == 2:
-            Vb = V[b_idx, :]  # (B,N)
-            Vb = xp.broadcast_to(Vb, (nE, nDet, N))  # (E,B,N)
-        else:
-            Vb = V[:, b_idx, :]  # (E,B,N)
-
-        # --- Step 4: amplitudes & probabilities ---
-        if xp.ndim(a) == 2:
-            # single emitter: a (E,N) -> A_i (E,B,N)
-            A_i = Vb * a[:, None, :]  # (E,B,N)
-            P_incoh = xp.sum(xp.abs(A_i) ** 2, axis=-1)  # (E,B)
-            P_total = xp.abs(xp.sum(A_i, axis=-1)) ** 2  # (E,B)
-            P_int = P_total - P_incoh  # (E,B)
-        else:
-            # multiple emitters: a (E,A,N) -> A_i (E,B,A,N)
-            A_i = Vb[:, :, None, :] * a[:, None, :, :]  # (E,B,A,N)
-            P_incoh = xp.sum(xp.abs(A_i) ** 2, axis=-1)  # (E,B,A)
-            P_total = xp.abs(xp.sum(A_i, axis=-1)) ** 2  # (E,B,A)
-            P_int = P_total - P_incoh  # (E,B,A)
-
-        # --- Step 5: if detector is scalar, squeeze the B axis (axis=1) ---
-        if b_scalar_in:
-            # (E,B)   -> (E,)     ; (E,B,A) -> (E,A)
-            P_total = xp.squeeze(P_total, axis=1)
-            P_incoh = xp.squeeze(P_incoh, axis=1)
-            P_int = xp.squeeze(P_int, axis=1)
-
-        return {
-            "total": self.backend.from_device(P_total),
-            "incoherent": self.backend.from_device(P_incoh),
-            "interference": self.backend.from_device(P_int),
-        }
 
     # def _get_mass_fractions_after(self, flavor_emit, L_km, E_GeV, antineutrino=False, return_amplitudes=False, psi=None):
     #

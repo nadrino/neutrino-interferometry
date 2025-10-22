@@ -5,7 +5,7 @@ from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
 from nu_waves.backends.torch_backend import make_torch_backend
 
-USE_NUMPY = False
+USE_NUMPY = True
 backend = None
 
 if not USE_NUMPY:
@@ -38,6 +38,9 @@ osc = Oscillator(
 def test_syntax():
     print("test_syntax test...")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10))
+    print(P.shape)
+    print(P)
+    exit(1)
     assert P.shape == (10, 3, 3)
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_emit=muon)
     assert P.shape == (10, 3)
