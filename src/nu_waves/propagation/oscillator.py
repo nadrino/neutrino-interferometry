@@ -224,22 +224,10 @@ class Oscillator:
             Lc, Ec = L_in, E_in
 
         center_shape = Lc.shape
-        use_sampling = (self.energy_sampler is not None) or (self.baseline_sampler is not None)
 
         # ---------- prepare flattened arrays ----------
-        if not use_sampling:
-            E_flat = Ec.reshape(-1)
-            L_flat = Lc.reshape(-1)
-        else:
-            ns = int(max(1, self.n_samples))
-
-            def _tile(x):
-                return xp.repeat_last(x, ns)
-
-            Es = self.energy_sampler(Ec, ns) if self.energy_sampler else _tile(Ec)
-            Ls = self.baseline_sampler(Lc, ns) if self.baseline_sampler else _tile(Lc)
-            E_flat = Es.reshape(-1)
-            L_flat = Ls.reshape(-1)
+        E_flat = Ec.reshape(-1)
+        L_flat = Lc.reshape(-1)
 
         # ---------- evolution operator ----------
         if self._use_matter:
@@ -301,10 +289,7 @@ class Oscillator:
             psi_out = xp.einsum("bij,kj->bki", S, psi)  # (B,nPsi,N)
 
         # ---------- reshape back ----------
-        if not use_sampling:
-            psi_out = psi_out.reshape(*center_shape, *psi_out.shape[1:])
-        else:
-            psi_out = psi_out.reshape(*center_shape, ns, *psi_out.shape[1:]).mean(axis=-3)
+        psi_out = psi_out.reshape(*center_shape, *psi_out.shape[1:])
 
         # ---------- squeeze scalar axes ----------
         if xp.size(L_in) == 1 and xp.size(E_in) == 1:
@@ -369,9 +354,7 @@ class Oscillator:
             L_km=L_km, E_GeV=E_GeV, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino
         )["total"]
 
-    def _probability_split_adiabatic(self, L_km, E_GeV,
-                                     flavor_emit=None, flavor_det=None,
-                                     antineutrino=False):
+    def _probability_split_adiabatic(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
         xp = self.backend.xp
 
         # Convert to tensor first, then get shape
