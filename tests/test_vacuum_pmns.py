@@ -5,7 +5,7 @@ from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
 from nu_waves.backends.torch_backend import make_torch_backend
 
-USE_NUMPY = True
+USE_NUMPY = False
 backend = None
 
 if not USE_NUMPY:
@@ -77,6 +77,7 @@ def test_zero_baseline_identity():
         flavor_emit=muon, flavor_det=[electron, muon, tau],
         L_km=0, E_GeV=np.linspace(0.2, 3.0, 10),
     )
+    print(P[:, electron])
     assert np.allclose(P[:, electron], 0.0, atol=1e-14) # no electron appearance
     assert np.allclose(P[:, tau], 0.0, atol=1e-14) # no tau appearance
     assert np.allclose(P[:, muon], 1.0, atol=1e-14) # all muons

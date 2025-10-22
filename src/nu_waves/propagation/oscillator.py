@@ -229,9 +229,7 @@ class Oscillator:
             rho, Ye = layer.rho_gcm3, layer.Ye
 
         H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)  # (nE,nF,nF)
-        import numpy as np
-        _, V_np = np.linalg.eigh(self.backend.from_device(H))  # mass→flavour
-        V = xp.asarray(V_np, dtype=dtype_c)  # (nE,nF,nF)
+        V = xp.linalg.eigh(H)
         Vc = xp.conjugate(V)  # V†
 
         # V†[:,:,alpha] has shape (nE,nF); collect all requested alphas → (nE,nF,nFe), then swap axes
@@ -328,9 +326,7 @@ class Oscillator:
             layer = self._matter_profile.layers[-1]  # detection layer
             rho, Ye = layer.rho_gcm3, layer.Ye
         H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
-        import numpy as np
-        _, V_np = np.linalg.eigh(self.backend.from_device(H))
-        V = xp.asarray(V_np, dtype=dtype_c)  # (nE,nF,nF)
+        V = xp.linalg.eigh(H)
         a = xp.einsum("b...f,bfi->b...i", psi, xp.conjugate(V))
         return a, V
 
@@ -339,15 +335,12 @@ class Oscillator:
 
         # ---- your core stays the same ----
         psi0 = self._generate_initial_state(flavor_emit=flavor_emit, E=E, antineutrino=antineutrino)
-        # print(f"psi0={psi0}")
         psi = self._propagate_state(psi=psi0, L=L, E=E, antineutrino=antineutrino)
-        # print(f"psi={psi}")
         a, V = self._project_state(
             psi=psi,
             E=E if self._use_matter else None,
             antineutrino=antineutrino if self._use_matter else None
         )
-        # print(f"a={a}, V={V}")
 
         # Detector projectors and amplitude sum over mass index j
         if xp.ndim(V) == 2:  # vacuum
