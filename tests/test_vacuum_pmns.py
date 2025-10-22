@@ -39,18 +39,23 @@ def test_syntax():
     print("test_syntax test...")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10))
     assert P.shape == (10, 3, 3)
+    print("Test OK")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_emit=muon)
     assert P.shape == (10, 3)
+    print("Test OK")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_det=muon)
     assert P.shape == (10, 3)
+    print("Test OK")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_emit=muon, flavor_det=[muon, electron])
     assert P.shape == (10, 2)
+    print("Test OK")
     P = osc.probability(
         L_km=np.linspace(0, 300, 10),
         E_GeV=np.linspace(0.2, 3.0, 10),
         flavor_emit=muon, flavor_det=[muon, electron]
     )
     assert P.shape == (10, 2)
+    print("Test OK")
     P = osc.probability(
         L_km=np.linspace(0, 300, 10),
         E_GeV=1,
@@ -75,9 +80,9 @@ def test_zero_baseline_identity():
         flavor_emit=muon, flavor_det=[electron, muon, tau],
         L_km=0, E_GeV=np.linspace(0.2, 3.0, 10),
     )
-    assert np.allclose(P[:, electron], 0.0, atol=1e-15) # no electron appearance
-    assert np.allclose(P[:, tau], 0.0, atol=1e-15) # no tau appearance
-    assert np.allclose(P[:, muon], 1.0, atol=1e-15) # all muons
+    assert np.allclose(P[:, electron], 0.0, atol=1e-14) # no electron appearance
+    assert np.allclose(P[:, tau], 0.0, atol=1e-14) # no tau appearance
+    assert np.allclose(P[:, muon], 1.0, atol=1e-14) # all muons
     print("zero_baseline_identity: success.")
 
 

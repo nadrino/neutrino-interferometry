@@ -77,12 +77,12 @@ class Oscillator:
 
     # helpers to make sure the pullback from the GPU memory happens once
     def propagate_state(self, flavor_emit, L_km, E_GeV, antineutrino=False):
-        return self.backend.to_device(
+        return self.backend.from_device(
             self._propagate_state(flavor_emit=flavor_emit, L_km=L_km, E_GeV=E_GeV, antineutrino=antineutrino)
         )
 
     def probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
-        return self.backend.to_device(
+        return self.backend.from_device(
             self._probability(
                 L_km=L_km, E_GeV=E_GeV, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino
             )
@@ -115,13 +115,7 @@ class Oscillator:
         N = self.hamiltonian.U.shape[0]
 
         # ---------- normalize indices ----------
-        def _as_idx(x, N):
-            if x is None:
-                return xp.arange(N)
-            x = xp.asarray(x)
-            return int(x) if x.ndim == 0 else x
-
-        a_idx = _as_idx(flavor_emit, N)
+        a_idx = xp.as_idx(flavor_emit, N)
         a_scalar = xp.isscalar(a_idx)
         if a_scalar:
             a_idx = [a_idx]
@@ -288,7 +282,7 @@ class Oscillator:
                 U = xp.asarray(self.hamiltonian.U, dtype=self.backend.dtype_complex)
                 m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=self.backend.dtype_real)
                 phase = (KM * L_flat / E_flat)[:, None] * m2[None, :]
-                phases = xp.exp((-1j) * phase).astype(self.backend.dtype_complex, copy=False)
+                phases = xp.astype(xp.exp((-1j) * phase), self.backend.dtype_complex, copy=False)
                 Uc = xp.conjugate(U).T
                 U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]
                 S = U_phase @ Uc
@@ -376,7 +370,10 @@ class Oscillator:
                                      antineutrino=False):
         xp = self.backend.xp
 
-        E_GeV = xp.broadcast_to(E_GeV, xp.shape(L_km)) if xp.ndim(L_km) == 1 and xp.ndim(E_GeV) == 0 else E_GeV
+        # Convert to tensor first, then get shape
+        L_km_tensor = xp.asarray(L_km) if not hasattr(L_km, 'shape') else L_km
+        E_GeV_tensor = xp.asarray(E_GeV) if not hasattr(E_GeV, 'shape') else E_GeV
+        E_GeV = xp.broadcast_to(E_GeV_tensor, L_km_tensor.shape) if L_km_tensor.ndim == 1 and E_GeV_tensor.ndim == 0 else E_GeV_tensor
 
         # --- Step 1: propagate and project onto mass basis ---
         psi0 = self._generate_initial_state(flavor_emit=flavor_emit, E_GeV=E_GeV, antineutrino=antineutrino)
@@ -393,14 +390,8 @@ class Oscillator:
         nEmit = 1 if xp.ndim(a) == 2 else lead_shape[1]
 
         # --- Step 2: indices (keep scalar flags BEFORE list conversion) ---
-        def _as_idx(x, N):
-            if x is None:
-                return xp.arange(N)
-            x = xp.asarray(x)
-            return int(x) if xp.ndim(x) == 0 else x
-
-        a_idx_raw = _as_idx(flavor_emit, N)
-        b_idx_raw = _as_idx(flavor_det, N)
+        a_idx_raw = xp.as_idx(flavor_emit, N)
+        b_idx_raw = xp.as_idx(flavor_det, N)
         a_scalar_in = xp.isscalar(a_idx_raw)
         b_scalar_in = xp.isscalar(b_idx_raw)
         a_idx = [a_idx_raw] if a_scalar_in else a_idx_raw

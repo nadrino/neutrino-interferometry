@@ -38,6 +38,19 @@ class _TorchXP:
             return getattr(torch, name)
         raise AttributeError(f"_TorchXP has no attribute {name}")
 
+
+    def shape(self, x, N):
+        if x is None:
+            return torch.arange(N)
+        x = torch.asarray(x, dtype=int)
+        return int(x) if x.ndim == 0 else x
+
+    def as_idx(self, x, N):
+        if x is None:
+            return torch.arange(N)
+        x = torch.asarray(x, dtype=int)
+        return int(x) if x.ndim == 0 else x
+
     def ndim(self, x):
         """Return number of dimensions of a Torch tensor, NumPy array, or scalar."""
         # handle scalar / list / numpy input gracefully
@@ -51,6 +64,9 @@ class _TorchXP:
                 return torch.as_tensor(x).ndim
             except Exception:
                 return 0
+
+    def astype(self, x, dtype, copy=False):
+        return x.to(dtype=dtype)
 
     def size(self, x):
         """Return total number of elements in a Torch tensor or array-like."""

@@ -11,6 +11,12 @@ class _NumpyXP:
             return getattr(np, name)
         raise AttributeError(f"_NumpyXP has no attribute {name}")
 
+    def as_idx(self, x, N):
+        if x is None:
+            return np.arange(N)
+        x = np.asarray(x, dtype=int)
+        return int(x) if x.ndim == 0 else x
+
     # common helpers used by the codebase
     def normal(self, loc=0.0, scale=1.0, size=None):
         return np.random.normal(loc=loc, scale=scale, size=size)
