@@ -39,23 +39,18 @@ def test_syntax():
     print("test_syntax test...")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10))
     assert P.shape == (10, 3, 3)
-    print("Test OK")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_emit=muon)
     assert P.shape == (10, 3)
-    print("Test OK")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_det=muon)
     assert P.shape == (10, 3)
-    print("Test OK")
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10), flavor_emit=muon, flavor_det=[muon, electron])
     assert P.shape == (10, 2)
-    print("Test OK")
     P = osc.probability(
         L_km=np.linspace(0, 300, 10),
         E_GeV=np.linspace(0.2, 3.0, 10),
         flavor_emit=muon, flavor_det=[muon, electron]
     )
     assert P.shape == (10, 2)
-    print("Test OK")
     P = osc.probability(
         L_km=np.linspace(0, 300, 10),
         E_GeV=1,

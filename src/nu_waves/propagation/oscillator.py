@@ -76,6 +76,11 @@ class Oscillator:
         self._matter_profile = None
 
     # helpers to make sure the pullback from the GPU memory happens once
+    def generate_initial_state(self, flavor_emit, E_GeV, antineutrino=False):
+        return self.backend.from_device(
+            self._generate_initial_state(flavor_emit=flavor_emit, E_GeV=E_GeV, antineutrino=antineutrino)
+        )
+
     def propagate_state(self, psi, L_km, E_GeV, antineutrino=False):
         return self.backend.from_device(
             self._propagate_state(psi=psi, L_km=L_km, E_GeV=E_GeV, antineutrino=antineutrino)
