@@ -319,7 +319,7 @@ class Oscillator:
 
         if not self._use_matter:
             V = xp.asarray(self.hamiltonian.U, dtype=dtype_c)  # (nF,nF)
-            a = xp.einsum("b...i,ji->b...j", psi, xp.conjugate(V))
+            a = xp.einsum("b...f,fi->b...i", psi, xp.conjugate(V))
             return a, V
 
         assert E is not None
@@ -332,7 +332,7 @@ class Oscillator:
         import numpy as np
         _, V_np = np.linalg.eigh(self.backend.from_device(H))
         V = xp.asarray(V_np, dtype=dtype_c)  # (nE,nF,nF)
-        a = xp.einsum("b...i,bij->b...j", psi, xp.conjugate(V))
+        a = xp.einsum("b...f,bfi->b...i", psi, xp.conjugate(V))
         return a, V
 
     def _probability_split_adiabatic(self, L, E, flavor_emit=None, flavor_det=None, antineutrino=False):
@@ -340,12 +340,16 @@ class Oscillator:
 
         # ---- your core stays the same ----
         psi0 = self._generate_initial_state(flavor_emit=flavor_emit, E=E, antineutrino=antineutrino)
+        print(f"psi0={psi0}")
         psi = self._propagate_state(psi=psi0, L=L, E=E, antineutrino=antineutrino)
+        print(f"psi={psi}")
         a, V = self._project_state(
             psi=psi,
             E=E if self._use_matter else None,
             antineutrino=antineutrino if self._use_matter else None
         )
+        print(f"a={a}, V={V}")
+
         # a: (nE, nFe, nF)
         nE, nFe, nF = a.shape
         nFd = len(flavor_det)
