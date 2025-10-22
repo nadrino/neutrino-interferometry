@@ -205,6 +205,10 @@ class _TorchLinalg:
         self.dtype_complex = dtype_complex
 
     def eigh(self, A):
+        try:
+            return torch.linalg.eigh(A)
+        except NotImplementedError:
+            pass
         """
         Deterministic & stable Hermitian eigendecomposition:
         run on CPU in float64/complex128, then cast back.

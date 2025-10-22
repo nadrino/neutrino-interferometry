@@ -77,16 +77,6 @@ class Oscillator:
         self._matter_profile = None
 
     # helpers to make sure the pullback from the GPU memory happens once
-    def generate_initial_state(self, flavor_emit, E_GeV, antineutrino=False):
-        return self.backend.from_device(
-            self._generate_initial_state(flavor_emit=flavor_emit, E_GeV=E_GeV, antineutrino=antineutrino)
-        )
-
-    def propagate_state(self, psi, L_km, E_GeV, antineutrino=False):
-        return self.backend.from_device(
-            self._propagate_state(psi=psi, L_km=L_km, E_GeV=E_GeV, antineutrino=antineutrino)
-        )
-
     def probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
         L, E = self._generate_L_and_E_arrays(L_km, E_GeV)
         flavor_emit = self._format_flavor_arg(flavor_emit)
@@ -98,17 +88,6 @@ class Oscillator:
             antineutrino=antineutrino
         )
         return self.backend.from_device(self._squeeze_array(out))
-
-    def probability_sampled(self, L_true_km, E_true_GeV, flavor_emit=None, flavor_det=None, antineutrino=False,
-                            L_sample_fct=None, E_sample_fct=None, nSamples=100):
-        L, E = self._format_arrays(L_true_km, E_true_GeV)
-
-        # out = self._probability_sampled(L_true_km=L, E_true_GeV=E,
-        #                               flavor_emit=flavor_emit, flavor_det=flavor_det,
-        #                               antineutrino=antineutrino,
-        #                               L_sample_fct=L_sample_fct, E_sample_fct=E_sample_fct, nSamples=nSamples)
-        #
-        # return self.backend.from_device(out)
 
     def _squeeze_array(self, x, preserve_axes=None):
         """
@@ -229,7 +208,7 @@ class Oscillator:
             rho, Ye = layer.rho_gcm3, layer.Ye
 
         H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)  # (nE,nF,nF)
-        V = xp.linalg.eigh(H)
+        _, V = self.backend.linalg.eigh(H)
         Vc = xp.conjugate(V)  # V†
 
         # V†[:,:,alpha] has shape (nE,nF); collect all requested alphas → (nE,nF,nFe), then swap axes
@@ -261,7 +240,7 @@ class Oscillator:
                 if self.use_exponentiation:
                     S = linalg.matrix_exp((-1j) * HL)  # (nE,nF,nF)
                 else:
-                    evals, evecs = xp.linalg.eigh(HL)  # HL = V diag(e) V^†
+                    evals, evecs = self.backend.linalg.eigh(HL)  # HL = V diag(e) V^†
                     phases = xp.exp((-1j) * evals)  # (nE,nF)
                     S = (evecs * phases[:, xp.newaxis, :]) @ xp.conjugate(evecs).transpose(0, 2, 1)  # (nE,nF,nF)
             else:
@@ -278,7 +257,7 @@ class Oscillator:
                     if self.use_exponentiation:
                         Sk = linalg.matrix_exp((-1j) * HLk)
                     else:
-                        evals, evecs = xp.linalg.eigh(HLk)
+                        evals, evecs = self.backend.linalg.eigh(HLk)
                         phases = xp.exp((-1j) * evals)
                         Sk = (evecs * phases[:, xp.newaxis, :]) @ xp.conjugate(evecs).transpose(0, 2, 1)
                     S = Sk @ S
@@ -289,20 +268,24 @@ class Oscillator:
                 HL = H * L[:, xp.newaxis, xp.newaxis]
                 S = linalg.matrix_exp((-1j) * HL)
             else:
-                U = xp.asarray(self.hamiltonian.U, dtype=dtype_c)  # (nF,nF)
-                m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=dtype_r)  # (nF,)
-                phase = 0.5 * (L / E)[:, None] * m2[None, :]  # (nE,nF)
-                phases = xp.exp((-1j) * phase)  # (nE,nF)
+                U = xp.asarray(self.hamiltonian.U, dtype=dtype_c)
+                m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=dtype_r)
+                # print(f"L / E:{L / E}")
+                phase = 0.5 * (L / E)[:, None] * m2[None, :]
+                # print(f"phase={phase}")
+                phases = xp.exp((-1j) * phase)
                 Uc = xp.conjugate(U).T
                 U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]
                 S = U_phase @ Uc  # (nE,nF,nF)
 
         # ---------- apply initial state(s): psi_out(b,i) = sum_j S(b,i,j) psi(b,j) ----------
-        psi = xp.asarray(psi, dtype=dtype_c)
-        if xp.ndim(psi) == 2:  # (nE,nF)
-            return xp.einsum("bij,bj->bi", S, psi)
-        else:  # (nE,*,nF)
-            return xp.einsum("bij,b...j->b...i", S, psi)
+        # print(f"S={S}")
+        if xp.ndim(psi) == 2:  # vacuum (nE,nF)
+            psi = xp.einsum("bij,bj->bi", S, psi)
+        else:  # matter (nE,*,nF)
+            psi = xp.einsum("bij,b...j->b...i", S, psi)
+
+        return psi
 
     def _project_state(self, psi, E=None, antineutrino=False):
         """
@@ -326,7 +309,7 @@ class Oscillator:
             layer = self._matter_profile.layers[-1]  # detection layer
             rho, Ye = layer.rho_gcm3, layer.Ye
         H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
-        V = xp.linalg.eigh(H)
+        _, V = self.backend.linalg.eigh(H)
         a = xp.einsum("b...f,bfi->b...i", psi, xp.conjugate(V))
         return a, V
 
@@ -344,11 +327,9 @@ class Oscillator:
 
         # Detector projectors and amplitude sum over mass index j
         if xp.ndim(V) == 2:  # vacuum
-            Vb = xp.asarray(V[flavor_det, :])  # (nFd, nF)
-            A = xp.einsum("kj,bej->bek", Vb, a)  # (nE, nFe, nFd)
+            A = xp.einsum("kj,bej->bek", V[flavor_det, :], a)  # (nE, nFe, nFd)
         else:  # matter
-            Vb = V[:, flavor_det, :]  # (nE, nFd, nF)
-            A = xp.einsum("bkj,bej->bek", Vb, a)  # (nE, nFe, nFd)
+            A = xp.einsum("bkj,bej->bek", V[:, flavor_det, :], a)  # (nE, nFe, nFd)
 
         P_total = xp.abs(A) ** 2  # (nE, nFe, nFd)
         return {

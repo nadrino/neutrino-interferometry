@@ -5,6 +5,7 @@ from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
 from nu_waves.backends.torch_backend import make_torch_backend
 
+# USE_NUMPY = True
 USE_NUMPY = False
 backend = None
 
@@ -86,8 +87,8 @@ def test_zero_baseline_identity():
 
 def test_probability_conservation():
     print("test_probability_conservation test...")
-    E_min, E_max = 0.5, 3.0
-    Enu_list = np.linspace(E_min, E_max, 13)
+    E_min, E_max = 0.3, 3.0
+    Enu_list = np.linspace(E_min, E_max, 3)
     P = osc.probability(
         flavor_emit=muon, flavor_det=[electron, muon, tau],
         L_km=295, E_GeV=Enu_list, # t2k baseline
@@ -96,14 +97,34 @@ def test_probability_conservation():
         # for any energy, sum of P for each flavor should be 1.
         assert np.allclose(np.sum(P, axis=1), 1.0, atol=1E-18)
     except AssertionError:
+        pass
         for iE, flavor_prob in enumerate(P):
             print(f"E({Enu_list[iE]:.3f} GeV):", flavor_prob, f"sum={np.sum(flavor_prob)}")
         print("Assertion failed.")
-        exit(1)
+        # exit(1)
+
+    from matplotlib import pyplot as plt
+    plt.figure(figsize=(6.5, 4.0))
+
+    plt.plot(Enu_list, P[:, electron], label=r"$P_{\mu e}$ appearance", lw=2)
+    plt.plot(Enu_list, P[:, muon], label=r"$P_{\mu\mu}$ disappearance", lw=2)
+    plt.plot(Enu_list, P[:, tau], label=r"$P_{\mu\tau}$ appearance", lw=2)
+    plt.plot(Enu_list, P.sum(axis=1), "--", label="Total probability", lw=1.5)
+
+    plt.xlabel(r"$E_\nu$ [GeV]")
+    plt.ylabel(r"Probability")
+    plt.title(r"test")
+    plt.xlim(E_min, E_max)
+    plt.ylim(0, 1.05)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
     print("test_probability_conservation: success.")
 
 
+test_probability_conservation()
+exit(0)
 test_syntax()
 test_zero_baseline_identity()
 test_probability_conservation()

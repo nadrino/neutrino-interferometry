@@ -54,11 +54,11 @@ class _NumpyXP:
     def conj(self, x):
         return np.conjugate(x)
 
-    def conjugate(self, x):
-        return np.conjugate(x)
+    # def conjugate(self, x):
+    #     return np.conjugate(x)
 
-    def exp(self, x):
-        return np.exp(x)
+    # def exp(self, x):
+    #     return np.exp(x)
 
     def einsum(self, subs, *ops):
         return np.einsum(subs, *ops)

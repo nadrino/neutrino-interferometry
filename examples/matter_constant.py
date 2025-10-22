@@ -7,6 +7,10 @@ from nu_waves.propagation.oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
+from nu_waves.backends.torch_backend import make_torch_backend
+backend = None
+# backend = make_torch_backend()
+
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
@@ -19,7 +23,7 @@ spec = Spectrum(n=3, m_lightest=0.)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
 # oscillator
-osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=backend)
 
 # calculate without matter effects
 osc.use_vacuum()

@@ -9,8 +9,8 @@ import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
 # toggle GPU
-torch_backend = None
-# torch_backend = make_torch_backend(seed=0, use_complex64=True)
+# torch_backend = None
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 nBins_L = 200
 nSamples_E = 10000
