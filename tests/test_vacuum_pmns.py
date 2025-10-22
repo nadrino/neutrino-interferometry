@@ -5,8 +5,8 @@ from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
 from nu_waves.backends.torch_backend import make_torch_backend
 
-# USE_NUMPY = True
-USE_NUMPY = False
+USE_NUMPY = True
+# USE_NUMPY = False
 backend = None
 
 if not USE_NUMPY:
@@ -14,7 +14,7 @@ if not USE_NUMPY:
         import torch
         print("torch available")
         backend = make_torch_backend(
-            # force_device="cpu"
+            force_device="cpu"
         )
         print(backend.device)
         HAS_TORCH = True

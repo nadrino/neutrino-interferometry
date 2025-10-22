@@ -38,7 +38,6 @@ class _TorchXP:
             return getattr(torch, name)
         raise AttributeError(f"_TorchXP has no attribute {name}")
 
-
     def shape(self, x, N):
         if x is None:
             return torch.arange(N)
@@ -50,6 +49,11 @@ class _TorchXP:
             return torch.arange(N)
         x = torch.asarray(x, dtype=int)
         return int(x) if x.ndim == 0 else x
+
+    def transpose_batched(self, x):
+        if hasattr(x, "permute"):  # torch
+            return x.permute(0, 2, 1)
+        return x.transpose(0, 2, 1)
 
     def ndim(self, x):
         """Return number of dimensions of a Torch tensor, NumPy array, or scalar."""
@@ -161,7 +165,7 @@ class _TorchXP:
         return torch.abs(x)
 
     def conjugate(self, x):
-        return torch.conj(x)
+        return torch.conj(x).resolve_conj().contiguous()
 
     def zeros(self, shape, dtype=None):
         dt = _map_dtype_torch(dtype, self.dtype_real, self.dtype_complex)

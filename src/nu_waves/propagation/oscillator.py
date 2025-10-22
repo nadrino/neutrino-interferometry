@@ -242,7 +242,16 @@ class Oscillator:
                 else:
                     evals, evecs = self.backend.linalg.eigh(HL)  # HL = V diag(e) V^†
                     phases = xp.exp((-1j) * evals)  # (nE,nF)
-                    S = (evecs * phases[:, xp.newaxis, :]) @ xp.conjugate(evecs).transpose(0, 2, 1)  # (nE,nF,nF)
+                    # Torch supports only transpose(dim0, dim1)
+                    # NumPy accepts transpose with any number of dims
+                    VcT = xp.conjugate(evecs)
+                    if hasattr(VcT, "permute"):  # torch.Tensor
+                        VcT = VcT.permute(0, 2, 1)  # (nE, nF, nF)
+                    else:
+                        VcT = VcT.transpose(0, 2, 1)  # numpy
+                    S = (evecs * phases[:, xp.newaxis, :]) @ VcT
+                    # S = (evecs * phases[:, xp.newaxis, :]) @ xp.conjugate(evecs).transpose(0, 2, 1) # numpy
+                    # S = (evecs * phases[:, xp.newaxis, :]) @ xp.conjugate(xp.transpose_batched(evecs)) # torch
             else:
                 # layered matter profile; dL_list[k] is (nE,) and in the SAME UNITS as L (eV^-1)
                 prof = self._matter_profile
@@ -299,9 +308,7 @@ class Oscillator:
 
         if not self._use_matter:
             V = xp.asarray(self.hamiltonian.U, dtype=dtype_c)  # (nF,nF)
-            # HOT FIX FOR MPS. .conjugate() is a lazy view, which flips the sign of a...
-            Vc = xp.conjugate(V).resolve_conj().contiguous()
-            a = xp.einsum("b...f,fi->b...i", psi, Vc)
+            a = psi @ xp.conjugate(V)
             return a, V
 
         assert E is not None
@@ -312,7 +319,7 @@ class Oscillator:
             rho, Ye = layer.rho_gcm3, layer.Ye
         H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)
         _, V = self.backend.linalg.eigh(H)
-        a = xp.einsum("b...f,bfi->b...i", psi, xp.conjugate(V))
+        a = xp.matmul(psi, xp.conjugate(V))
         return a, V
 
     def _probability_split_adiabatic(self, L, E, flavor_emit=None, flavor_det=None, antineutrino=False):
@@ -328,9 +335,12 @@ class Oscillator:
 
         # Detector projectors and amplitude sum over mass index j
         if xp.ndim(V) == 2:  # vacuum
-            A = xp.einsum("kj,bej->bek", V[flavor_det, :], a)  # (nE, nFe, nFd)
+            A = a @ V[flavor_det, :].T #
         else:  # matter
-            A = xp.einsum("bkj,bej->bek", V[:, flavor_det, :], a)  # (nE, nFe, nFd)
+            VbT = xp.swapaxes(V[:, flavor_det, :], -1, -2)  # (nE, nF, nFd)
+            A = xp.matmul(a, VbT)  # (nE, nFe, nFd)
+            # A = xp.matmul(V[:, flavor_det, :], a)
+            # A = xp.einsum("bkj,bej->bek", V[:, flavor_det, :], a)  # (nE, nFe, nFd)
 
         P_total = xp.abs(A) ** 2  # (nE, nFe, nFd)
         return {
