@@ -91,6 +91,7 @@ class Oscillator:
         L, E = self._generate_L_and_E_arrays(L_km, E_GeV)
         flavor_emit = self._format_flavor_arg(flavor_emit)
         flavor_det = self._format_flavor_arg(flavor_det)
+        print(f"L={L}, E={E}, flavor_emit={flavor_emit}, flavor_det={flavor_det}")
         out = self._probability(
             L=L, E=E,
             flavor_emit=flavor_emit,
@@ -369,6 +370,41 @@ class Oscillator:
         return self._probability_split_adiabatic(
             L=L, E=E, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino
         )["total"]
+
+    def _generate_L_and_E_arrays(self, L_km, E_GeV):
+        xp = self.backend.xp
+
+        # ---------- normalize inputs ----------
+        L_in = xp.asarray(L_km, dtype=self.backend.dtype_real)
+        E_in = xp.asarray(E_GeV, dtype=self.backend.dtype_real)
+
+        if xp.ndim(L_in) == 0:
+            L_in = L_in.reshape(1)
+        if xp.ndim(E_in) == 0:
+            E_in = E_in.reshape(1)
+
+        # ---------- enforce pairwise semantics ----------
+        if xp.size(L_in) == 1 and xp.size(E_in) > 1:
+            Lc = xp.broadcast_to(L_in, E_in.shape)
+            Ec = E_in
+        elif xp.size(E_in) == 1 and xp.size(L_in) > 1:
+            Lc = L_in
+            Ec = xp.broadcast_to(E_in, L_in.shape)
+        else:
+            if xp.size(L_in) != xp.size(E_in):
+                raise ValueError(
+                    f"Length mismatch: L_km has {xp.size(L_in)}, E_GeV has {xp.size(E_in)}. "
+                    "They must match for pairwise propagation."
+                )
+            Lc, Ec = L_in, E_in
+
+        center_shape = Lc.shape
+
+        # ---------- prepare flattened arrays ----------
+        E_flat = Ec.reshape(-1) * GEV_TO_EV
+        L_flat = Lc.reshape(-1) * KM_TO_EVINV
+
+        return L_flat, E_flat
 
     def _probability_sampled(self, L_true_km, E_true_GeV, flavor_emit=None, flavor_det=None, antineutrino=False, L_sample_fct=None, E_sample_fct=None, nSamples=100):
         if L_sample_fct is None and E_sample_fct is None:

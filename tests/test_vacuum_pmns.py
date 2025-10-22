@@ -37,7 +37,7 @@ osc = Oscillator(
 
 def test_syntax():
     print("test_syntax test...")
-    P = osc.probability(L_km=0, E_GeV=1)
+    P = osc.probability(L_km=[0], E_GeV=[1])
     print(P.shape)
     print(P)
     exit(1)
