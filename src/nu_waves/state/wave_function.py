@@ -50,6 +50,6 @@ class WaveFunction:
             Shape (nF, nF).
         """
         # H' = U† H U  → ψ' = U† ψ
-        # shapes: (nE, nF, nF) @ (nE, nF, 1)  → (nE, nF, 1)
+        # shapes: ( (nF, nF) @ (nE, nFd, nF, 1) ) -> (nE, nFd, nF, 1) -> (nE, nFd, nF)
         self.values = (eigen_vectors_dagger @ self.values[..., None])[..., 0]
         self.current_basis = target_basis
