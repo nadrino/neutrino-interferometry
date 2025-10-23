@@ -1,9 +1,10 @@
 import numpy as np
 from nu_waves.hamiltonian.base import Hamiltonian
-from nu_waves.backends import make_numpy_backend
+from nu_waves.backends import global_backend as backend
 from nu_waves.matter.profile import MatterProfile
 from nu_waves.utils.units import KM_TO_EVINV
 from nu_waves.utils.units import GEV_TO_EV
+from nu_waves.state.wave_function import WaveFunction, Basis
 
 
 class Oscillator:
@@ -180,42 +181,43 @@ class Oscillator:
 
     def _generate_initial_state(self, flavor_emit, E, antineutrino=False):
         """
-        Inputs:
-          E: (nE,) in eV
-          flavor_emit: list[int] of emitting flavours (len = nFe)
-        Returns:
-          psi0: (nE, nFe, nF) amplitudes at x=0 expressed in the working basis:
-                - vacuum: flavour basis one-hots
-                - matter: projected into matter eigenbasis at production (V† · e_alpha)
+        Generate the initial neutrino state |ν_flavor_emit⟩ for each energy.
+
+        Parameters
+        ----------
+        flavor_emit : int
+            Index of the emitted flavor (0 = ν_e, 1 = ν_μ, 2 = ν_τ, ...)
+        E : xp.ndarray
+            Energies of the neutrinos (shape (nE,))
+        antineutrino : bool, optional
+            If True, use the CP-conjugate state (same flavor vector, but you may
+            later apply conjugate mixing matrices). Default: False.
+
+        Returns
+        -------
+        Wavefunction
+            Object containing the (nE, nF) complex array in the FLAVOR basis.
         """
         xp = self.backend.xp
-        dtype_c = self.backend.dtype_complex
-        nF = int(self.hamiltonian.n_flavors)
-        nE = int(E.shape[0])
-        a_idx = xp.asarray(flavor_emit, dtype=int)  # (nFe,)
-        nFe = int(a_idx.shape[0])
+        nE = E.shape[0]
+        nF = self.hamiltonian.n_flavors
 
-        if not self._use_matter:
-            psi0 = xp.zeros((nE, nFe, nF), dtype=dtype_c)
-            psi0[:, xp.arange(nFe), a_idx] = 1.0  # one-hots in flavour basis
-            return psi0
+        # Create zero-filled wavefunction array
+        psi = xp.zeros((nE, nF), dtype=self.backend.ctype)
 
-        # matter: project flavour one-hots to matter eigenbasis at production layer
-        if getattr(self, "_matter_profile", None) is None:
-            rho, Ye = self._matter_args
-        else:
-            layer = self._matter_profile.layers[0]  # production layer
-            rho, Ye = layer.rho_gcm3, layer.Ye
+        # Set the emitted flavor amplitude to 1
+        psi[:, flavor_emit] = 1.0
 
-        H = self.hamiltonian.matter_constant(E, rho_gcm3=rho, Ye=Ye, antineutrino=antineutrino)  # (nE,nF,nF)
-        _, V = self.backend.linalg.eigh(H)
-        Vc = xp.conjugate(V)  # V†
+        # Create the holder
+        state = WaveFunction(
+            current_basis=Basis.FLAVOR,
+            values=psi,
+            antineutrino=antineutrino
+        )
 
-        # V†[:,:,alpha] has shape (nE,nF); collect all requested alphas → (nE,nF,nFe), then swap axes
-        psi0 = xp.swapaxes(Vc[:, :, a_idx], 1, 2)  # (nE, nFe, nF)
-        return psi0
+        return state
 
-    def _propagate_state(self, psi, L, E, antineutrino=False):
+    def _propagate_state(self, psi: WaveFunction, L, E, antineutrino=False):
         """
         PRIVATE core.
         Assumptions (no checks):
@@ -286,7 +288,7 @@ class Oscillator:
                 S = U_phase @ Uc  # (nE,nF,nF)
 
         # ---------- apply initial state(s): psi_out(b,i) = sum_j S(b,i,j) psi(b,j) ----------
-        psi = xp.matmul(S[:, None, ...], psi[..., None])[..., 0]
+        psi = (S[:, None, ...] @ psi[..., None])[..., 0]
 
         return psi
 
