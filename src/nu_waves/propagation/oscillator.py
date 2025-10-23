@@ -279,20 +279,14 @@ class Oscillator:
             else:
                 U = xp.asarray(self.hamiltonian.U, dtype=dtype_c)
                 m2 = xp.asarray(self.hamiltonian.m2_diag, dtype=dtype_r)
-                # print(f"L / E:{L / E}")
                 phase = 0.5 * (L / E)[:, None] * m2[None, :]
-                # print(f"phase={phase}")
                 phases = xp.exp((-1j) * phase)
                 Uc = xp.conjugate(U).T
                 U_phase = U[xp.newaxis, :, :] * phases[:, xp.newaxis, :]
                 S = U_phase @ Uc  # (nE,nF,nF)
 
         # ---------- apply initial state(s): psi_out(b,i) = sum_j S(b,i,j) psi(b,j) ----------
-        # print(f"S={S}")
-        if xp.ndim(psi) == 2:  # vacuum (nE,nF)
-            psi = xp.einsum("bij,bj->bi", S, psi)
-        else:  # matter (nE,*,nF)
-            psi = xp.einsum("bij,b...j->b...i", S, psi)
+        psi = xp.matmul(S[:, None, ...], psi[..., None])[..., 0]
 
         return psi
 
@@ -339,8 +333,6 @@ class Oscillator:
         else:  # matter
             VbT = xp.swapaxes(V[:, flavor_det, :], -1, -2)  # (nE, nF, nFd)
             A = xp.matmul(a, VbT)  # (nE, nFe, nFd)
-            # A = xp.matmul(V[:, flavor_det, :], a)
-            # A = xp.einsum("bkj,bej->bek", V[:, flavor_det, :], a)  # (nE, nFe, nFd)
 
         P_total = xp.abs(A) ** 2  # (nE, nFe, nFd)
         return {
