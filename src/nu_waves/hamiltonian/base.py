@@ -8,11 +8,32 @@ from abc import ABC, abstractmethod
 
 class Hamiltonian(ABC):
     def __init__(self, mixing_matrix, m2_array):
-        xp = Backend().xp()
-        self.mixing_matrix = xp.asarray(mixing_matrix, dtype=Backend().complex_dtype())
-        self.mixing_matrix_dagger = xp.conjugate(self.mixing_matrix).T
-        self.m2 = xp.asarray(m2_array, dtype=Backend().real_dtype())
-        self.n_flavors = self.mixing_matrix.shape[0]
+        self._mixing_matrix = None
+        self._mixing_matrix_dagger = None
+        self._m2 = None
+        self._n_flavors = None
+
+        xp = Backend.xp()
+        self._mixing_matrix = xp.asarray(mixing_matrix, dtype=Backend.complex_dtype())
+        self._mixing_matrix_dagger = xp.conjugate(self._mixing_matrix).T
+        self._m2 = xp.asarray(m2_array, dtype=Backend.real_dtype())
+        self._check_parameters()
+
+    def _check_parameters(self):
+        assert (self._m2.shape[0] == self._mixing_matrix.shape[0])
+        self._n_flavors = self._mixing_matrix.shape[0]
+
+    def get_n_flavors(self):
+        return self._n_flavors
+
+    def set_m2_array(self, m2_array):
+        self._m2 = Backend.xp().asarray(m2_array, dtype=Backend.real_dtype())
+        self._check_parameters()
+
+    def set_mixing_matrix(self, mixing_matrix):
+        self._mixing_matrix = Backend.xp().asarray(mixing_matrix, dtype=Backend.complex_dtype())
+        self._mixing_matrix_dagger = Backend.xp().conjugate(self._mixing_matrix).T
+        self._check_parameters()
 
     # Default: produce S(L) in FLAVOR basis
     @abstractmethod
