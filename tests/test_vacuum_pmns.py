@@ -1,7 +1,8 @@
 import numpy as np
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import Oscillator
+from nu_waves.hamiltonian.vacuum import VacuumHamiltonian
+from nu_waves.propagation.new_oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
 from nu_waves.backends.torch_backend import make_torch_backend
 
@@ -30,15 +31,17 @@ phases = {(1, 3): np.deg2rad(195)}
 
 dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428}
 
-osc = Oscillator(
+h = VacuumHamiltonian(
     mixing_matrix=Mixing(dim=3, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix(),
-    m2_list=Spectrum(n=3, dm2=dm2).get_m2(),
-    backend=backend,
+    m2_array=Spectrum(n=3, m_lightest=0, dm2=dm2).get_m2()
 )
+
+osc = Oscillator(hamiltonian=h)
 
 def test_syntax():
     print("test_syntax test...")
     P = osc.probability(L_km=[0], E_GeV=[1])
+    print(f"P = {P}")
     assert P.shape == (3, 3)
     P = osc.probability(L_km=0, E_GeV=np.linspace(0.2, 3.0, 10))
     assert P.shape == (10, 3, 3)
