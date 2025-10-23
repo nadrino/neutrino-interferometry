@@ -1,28 +1,34 @@
 from nu_waves.backends import make_numpy_backend
 from nu_waves.utils.units import VCOEFF_EV
 from nu_waves.state.wave_function import WaveFunction, Basis
+from nu_waves.globals.backend import Backend
 
 from abc import ABC, abstractmethod
 
 
 class Hamiltonian(ABC):
-    def __init__(self, n_flavors):
-        self.n_flavors = n_flavors
+    def __init__(self, mixing_matrix, m2_array):
+        xp = Backend().xp()
+        self.mixing_matrix = xp.asarray(mixing_matrix, dtype=Backend().complex_dtype())
+        self.mixing_matrix_dagger = xp.conjugate(self.mixing_matrix).T
+        self.m2 = xp.asarray(m2_array, dtype=Backend().real_dtype())
+        self.n_flavors = self.mixing_matrix.shape[0]
 
     # Default: produce S(L) in FLAVOR basis
     @abstractmethod
-    def propagator(self, L, E=None) -> any:
+    def get_barger_propagator(self, L, E=None) -> any:
         """Return S(L) in FLAVOR basis, shape (nE, nF, nF)."""
         ...
 
-    # Generic propagation (can be overridden)
+    # Generic propagation (can be overridden for faster calculations)
     def propagate_state(self, psi: WaveFunction, L, E=None):
         # Ensure ψ is in a flavor basis for the default path
+        # Psi will be returned expressed in the flavor basis
         if psi.current_basis != Basis.FLAVOR:
             raise ValueError("Default Hamiltonian expects psi in FLAVOR basis. "
                              "Override propagate_state in your subclass, or rotate ψ beforehand.")
 
-        S = self.propagator(L=L, E=E)                       # (nE,nF,nF), flavor basis
+        S = self.get_barger_propagator(L=L, E=E)                       # (nE,nF,nF), flavor basis
         psi.values = (S @ psi.values[..., None])[..., 0]    # (nE,nF)
 
 

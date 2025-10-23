@@ -1,49 +1,38 @@
 from nu_waves.hamiltonian.base import Hamiltonian
 from nu_waves.state.wave_function import WaveFunction, Basis
-from nu_waves.backends.global_backend import get_backend
+from nu_waves.globals.backend import Backend
+
 
 class VacuumHamiltonian(Hamiltonian):
-    def __init__(self, U_flavor_from_mass, m2_eV2):
-        nF = U_flavor_from_mass.shape[0]
+    def __init__(self, mixing_matrix, m2_array):
+        super().__init__(mixing_matrix=mixing_matrix, m2_array=m2_array)
 
-        get_backend().xp
+    def propagate_state(self, psi: WaveFunction, L, E=None):
+        xp = Backend().xp()
 
-        super().__init__(xp=xp, n_flavors=nF)
-        self.U = xp.asarray(U_flavor_from_mass, dtype=xp)     # (nF,nF)
-        self.Ud = xp.conjugate(self.U).T                          # U†
-        self.m2 = xp.asarray(m2_eV2, dtype=cdtype)                # (nF,)
+        # Rotate psi to mass basis if needed
+        if psi.current_basis == Basis.FLAVOR:
+            psi.to_basis(Basis.MASS, self.mixing_matrix_dagger)
 
-    def propagate_state(self, psi: WaveFunction, E_GeV, L_km) -> WaveFunction:
-        xp = self.xp
-        E = xp.asarray(E_GeV, dtype=self.cdtype)                  # (nE,)
-        nE = E.shape[0]
+        if psi.current_basis != Basis.MASS:
+            raise ValueError(f"VacuumHamiltonian: unsupported input basis for psi: {psi.current_basis}")
 
-        # phases φ_i = 1.267 * Δm_i^2[eV^2] * L[km] / E[GeV]
-        phi = 1.267 * (L_km / E)[:, None] * self.m2[None, :]      # (nE,nF)
-        D = xp.exp(-1j * phi)                                     # (nE,nF)
-
-        # Rotate ψ to mass basis only if needed
-        if psi.basis == Basis.MASS:
-            psi_m = psi.values                                     # (nE,nF)
-        elif psi.basis == Basis.FLAVOR:
-            psi_m = (self.Ud[None, :, :] @ psi.values[..., None])[..., 0]
-        else:
-            raise ValueError("VacuumHamiltonian: unsupported input basis for ψ.")
+        # phases φ_i = 1.267 * Δm_i^2[eV^2] * L[eV-1] / E[eV]
+        phases = 0.5 * (L / E)[:, None] * self.m2[None, :]    # (nE, nF)
+        D = xp.exp(-1j * phases)[:, None, :]                    # (nE, 1, nF)
 
         # Diagonal propagation in mass basis
-        psi_m = psi_m * D
+        psi.values = psi.values * D                             # (nE, nFe, nF)
 
-        # Rotate back to flavor (propagators in your code downstream expect flavor)
-        psi_f = (self.U[None, :, :] @ psi_m[..., None])[..., 0]
-        return psi.copy_like(values=psi_f, basis=Basis.FLAVOR)
+        # convention
+        psi.to_basis(Basis.FLAVOR, self.mixing_matrix)
 
-    # If you still want a flavor-basis S for other callers:
-    def propagator(self, E_GeV, L_km):
-        xp = self.xp
-        E = xp.asarray(E_GeV, dtype=self.cdtype)
-        phi = 1.267 * (L_km / E)[:, None] * self.m2[None, :]
-        D = xp.exp(-1j * phi)                                     # (nE,nF)
-        U, Ud = self.U, self.Ud
-        S = (U[None, :, :] * D[:, None, :]) @ Ud[None, :, :]
-        return S.astype(self.cdtype)
+    def get_barger_propagator(self, L, E=None):
+        xp = Backend().xp()
+
+        phases = 1.267 * (L / E)[:, None] * self.m2[None, :]
+        D = xp.exp(-1j * phases)
+
+        S = (self.mixing_matrix[None, :, :] * D[:, None, :]) @ self.mixing_matrix_dagger[None, :, :]
+        return S
 
