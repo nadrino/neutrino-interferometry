@@ -49,8 +49,8 @@ P_mue = osc.probability(L_km=L_flat, E_GeV=E_flat, flavor_emit=1, flavor_det=0) 
 # alpha=1 (muon), beta=1 (muon) → disappearance
 P_mumu = osc.probability(L_km=L_flat, E_GeV=E_flat, flavor_emit=1, flavor_det=1)  # (nL, nE)
 
-P_mue = P_mue.reshape(nE, nL)
-P_mumu = P_mumu.reshape(nE, nL)
+P_mue = P_mue.reshape(nL, nE)
+P_mumu = P_mumu.reshape(nL, nE)
 
 t1 = time.perf_counter()
 print(f"Computation time: {t1 - t0:.3f} s")
