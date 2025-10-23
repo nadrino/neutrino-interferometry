@@ -6,7 +6,7 @@ from nu_waves.globals.backend import Backend
 from abc import ABC, abstractmethod
 
 
-class Hamiltonian(ABC):
+class HamiltonianBase(ABC):
     def __init__(self, mixing_matrix, m2_array):
         self._mixing_matrix = None
         self._mixing_matrix_dagger = None

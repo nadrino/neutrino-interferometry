@@ -1,9 +1,9 @@
-from nu_waves.hamiltonian.base import Hamiltonian
+from nu_waves.hamiltonian.base import HamiltonianBase
 from nu_waves.state.wave_function import WaveFunction, Basis
 from nu_waves.globals.backend import Backend
 
 
-class VacuumHamiltonian(Hamiltonian):
+class Hamiltonian(HamiltonianBase):
     def __init__(self, mixing_matrix, m2_array):
         super().__init__(mixing_matrix=mixing_matrix, m2_array=m2_array)
 

@@ -1,4 +1,4 @@
-from nu_waves.hamiltonian.base import Hamiltonian
+from nu_waves.hamiltonian.base import HamiltonianBase
 from nu_waves.state.wave_function import WaveFunction, Basis
 from nu_waves.globals.backend import Backend
 from nu_waves.utils.units import GEV_TO_EV, KM_TO_EVINV
@@ -6,7 +6,7 @@ from nu_waves.utils.units import GEV_TO_EV, KM_TO_EVINV
 
 class Oscillator:
 
-    def __init__(self, hamiltonian: Hamiltonian):
+    def __init__(self, hamiltonian: HamiltonianBase):
         self.hamiltonian = hamiltonian
 
     def probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
