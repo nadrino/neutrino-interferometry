@@ -42,18 +42,21 @@ E_flat = E_grid.ravel()
 # osc.set_constant_density(rho_gcm3=2.8, Ye=0.5)
 
 t0 = time.perf_counter()
-
 # --- Compute probabilities in grid mode (shape -> (nL, nE) after selection) ---
 # alpha=1 (muon), beta=0 (electron) → appearance
 P_mue = osc.probability(L_km=L_flat, E_GeV=E_flat, flavor_emit=1, flavor_det=0)   # (nL, nE)
 # alpha=1 (muon), beta=1 (muon) → disappearance
 P_mumu = osc.probability(L_km=L_flat, E_GeV=E_flat, flavor_emit=1, flavor_det=1)  # (nL, nE)
+t1 = time.perf_counter()
+print(f"Computation time: {t1 - t0:.3f} s")
+
+if nE * nL > 1E6:
+    print("Too many bins to draw, skipping.")
+    exit(0)
 
 P_mue = P_mue.reshape(nL, nE)
 P_mumu = P_mumu.reshape(nL, nE)
 
-t1 = time.perf_counter()
-print(f"Computation time: {t1 - t0:.3f} s")
 
 # --- Plot helper ---
 def plot_oscillogram(ax, E, L, P, title):
@@ -79,7 +82,6 @@ def plot_oscillogram(ax, E, L, P, title):
 fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), constrained_layout=True)
 plot_oscillogram(axes[0], E_vals, L_vals, P_mue,  r"$P(\nu_\mu\to\nu_e)$")
 plot_oscillogram(axes[1], E_vals, L_vals, P_mumu, r"$P(\nu_\mu\to\nu_\mu)$")
-
 
 # plt.savefig("../figures/vacuum_2d_pmns.pdf") # too heavy
 plt.savefig("../figures/vacuum_2d_pmns.jpg", dpi=150) if not os.environ.get("CI") else None
