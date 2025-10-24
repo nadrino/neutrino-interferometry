@@ -133,7 +133,7 @@ class Oscillator:
         """
         xp = self.backend.xp
         if arg is None:
-            return list(range(int(self.hamiltonian.n_flavors)))
+            return list(range(int(self.hamiltonian.n_neutrinos)))
 
         if isinstance(arg, int):
             out = [int(arg)]
@@ -200,7 +200,7 @@ class Oscillator:
         """
         xp = self.backend.xp
         nE = E.shape[0]
-        nF = self.hamiltonian.n_flavors
+        nF = self.hamiltonian.n_neutrinos
 
         # Create zero-filled wavefunction array
         psi = xp.zeros((nE, nF), dtype=self.backend.ctype)

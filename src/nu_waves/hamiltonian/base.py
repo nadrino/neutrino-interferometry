@@ -14,7 +14,7 @@ class HamiltonianBase(ABC):
         self._check_parameters()
 
     @property
-    def n_flavors(self):
+    def n_neutrinos(self):
         return self._mixing.n_neutrinos
 
     @property
