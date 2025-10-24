@@ -16,7 +16,8 @@ class Backend:
         import torch
 
         if module is torch:
-            cls._current_api = TorchCompat()
+            from nu_waves.backends.torch_backend import TorchBackend
+            cls._current_api = TorchBackend()
         else:
             cls._current_api = module
 
@@ -61,41 +62,6 @@ class Backend:
             import numpy as np
             return np.asarray(jnp.array(arr))
         return arr
-
-class TorchCompat:
-
-    """Subset of Array-API interface mapped to torch."""
-    def __getattr__(self, name):
-        import torch
-        # delegate to torch if it exists
-        if hasattr(torch, name):
-            return getattr(torch, name)
-        raise AttributeError(f"TorchCompat: torch has no attribute '{name}'")
-
-    # explicit overrides for missing Array API functions
-    def asarray(self, x, dtype=None):
-        import torch
-        return torch.as_tensor(x, dtype=dtype)
-
-    def conjugate(self, x):
-        import torch
-        return torch.conj(x)
-
-    def ndim(self, x):
-        """Return number of dimensions of tensor."""
-        return x.ndim
-
-    def shape(self, x):
-        """Return shape tuple."""
-        return tuple(x.shape)
-
-    def size(self, x, dim=None):
-        """Return total number of elements or along a given dimension."""
-        import torch
-        if dim is not None:
-            return x.shape[dim]
-        # flatten torch.Size to int
-        return int(torch.tensor(x.numel()).item())
 
 
 # default is Numpy
