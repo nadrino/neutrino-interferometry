@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.hamiltonian.vacuum import Hamiltonian
+from nu_waves.hamiltonian import vacuum
 from nu_waves.propagation.new_oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 
@@ -15,9 +15,10 @@ angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(
 phases = {(1, 3): np.deg2rad(195)}
 dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428}
 
-h = Hamiltonian(
-    mixing_matrix=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix(),
-    m2_array=Spectrum(n_neutrinos=3, m_lightest=0., dm2=dm2).get_m2()
+h = vacuum.Hamiltonian(
+    mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=3, m_lightest=0, dm2=dm2),
+    antineutrino=False
 )
 osc = Oscillator(hamiltonian=h)
 
@@ -37,9 +38,10 @@ E_hi = np.array([1e6])
 P_np_hi  = osc.probability(L_km=295, E_GeV=E_hi, flavor_emit=None, flavor_det=None)
 
 Backend.set_api(torch, device="mps")
-h_mps = Hamiltonian(
-    mixing_matrix=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix(),
-    m2_array=Spectrum(n_neutrinos=3, m_lightest=0., dm2=dm2).get_m2()
+h_mps = vacuum.Hamiltonian(
+    mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=3, m_lightest=0, dm2=dm2),
+    antineutrino=False
 )
 osc_mps = Oscillator(hamiltonian=h_mps)
 P_mps_hi = osc_mps.probability(L_km=295, E_GeV=E_hi, flavor_emit=None, flavor_det=None)
