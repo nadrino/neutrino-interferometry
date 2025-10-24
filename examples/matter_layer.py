@@ -63,8 +63,7 @@ print("One-layer profile reproduces constant-density result")
 
 # --- optional: repeat on MPS backend ---
 try:
-    from nu_waves.backends import make_torch_backend
-    torch_backend = make_torch_backend(seed=0, use_complex64=True)
+        torch_backend = make_torch_backend(seed=0, use_complex64=True)
     osc_mps = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
     profile = MatterProfile.from_fractions([rho], [Ye], [1.0])
     osc_mps.set_layered_profile(profile)

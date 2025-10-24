@@ -5,7 +5,6 @@ from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.solar import SolarProfile
-from nu_waves.backends import make_torch_backend
 
 # toggle for CPU/GPU
 torch_backend = None

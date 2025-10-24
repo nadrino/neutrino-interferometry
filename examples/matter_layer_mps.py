@@ -4,12 +4,10 @@ from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.profile import MatterProfile
-from nu_waves.backends import make_numpy_backend
 
 # Torch backend is optional
 try:
-    from nu_waves.backends import make_torch_backend
-    TORCH_AVAILABLE = True
+        TORCH_AVAILABLE = True
 except Exception:
     TORCH_AVAILABLE = False
 

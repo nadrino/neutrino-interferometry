@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
-from nu_waves.backends.torch_backend import make_torch_backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 

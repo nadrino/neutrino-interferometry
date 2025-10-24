@@ -4,7 +4,6 @@ from nu_waves.models.spectrum import Spectrum
 from nu_waves.hamiltonian.vacuum import Hamiltonian
 from nu_waves.propagation.new_oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
-from nu_waves.backends.torch_backend import make_torch_backend
 
 USE_NUMPY = True
 # USE_NUMPY = False

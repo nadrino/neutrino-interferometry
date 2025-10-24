@@ -8,7 +8,6 @@ from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.prem import PREMModel
 from nu_waves.matter.profile import MatterProfile
-from nu_waves.backends import make_torch_backend
 import nu_waves.utils.style
 
 # toggle for CPU/GPU

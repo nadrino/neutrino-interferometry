@@ -7,7 +7,6 @@ from nu_waves.propagation.oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
-from nu_waves.backends.torch_backend import make_torch_backend
 # backend = None
 backend = make_torch_backend(
     force_device="cpu"
