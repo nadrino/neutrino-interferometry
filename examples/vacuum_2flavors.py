@@ -9,8 +9,8 @@ from nu_waves.globals.backend import Backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
-import torch
-Backend.set_api(torch, device='mps')
+# import torch
+# Backend.set_api(torch, device='mps')
 
 nBins_L = 200
 nSamples_E = 100000
@@ -24,8 +24,9 @@ dm2 = {(2, 1): 1}
 
 # oscillator
 h = vacuum.Hamiltonian(
-    mixing_matrix=Mixing(n_neutrinos=n_neutrinos, mixing_angles=angles).build_mixing_matrix(),
-    m2_array=Spectrum(n_neutrinos=n_neutrinos, m_lightest=0, dm2=dm2).get_m2()
+    mixing=Mixing(n_neutrinos=n_neutrinos, mixing_angles=angles),
+    spectrum=Spectrum(n_neutrinos=n_neutrinos, dm2=dm2),
+    antineutrino=True
 )
 osc = Oscillator(hamiltonian=h)
 
