@@ -4,17 +4,68 @@ from nu_waves.globals.backend import Backend
 from nu_waves.utils.units import GEV_TO_EV, KM_TO_EVINV
 
 
+def _sample_array(X, n_samples, sampling_fct):
+    if sampling_fct is not None:
+        nX = X.shape[0]
+        X_sampled = sampling_fct(X, n_samples)  # (nX, n_samples)
+        if X_sampled.shape != (nX, n_samples):
+            raise ValueError(f"E_sampled must return shape {(nX, n_samples)}, got {X_sampled.shape}")
+    else:
+        X_sampled = Backend.xp().repeat(X[:, None], n_samples, axis=1)  # (nX, n_samples)
+
+    # flatten to feed probability(...)
+    return X_sampled.reshape(-1)  # (nX*n_samples,)
+
+
 class Oscillator:
 
     def __init__(self, hamiltonian: HamiltonianBase):
         self.hamiltonian = hamiltonian
 
     def probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
+        # unify array format
         L, E = self._generate_L_and_E_arrays(L_km, E_GeV)
         flavor_emit = self._format_flavor_arg(flavor_emit)
         flavor_det = self._format_flavor_arg(flavor_det)
+
+        # convert units
+        L *= KM_TO_EVINV
+        E *= GEV_TO_EV
+
+        # compute probabilities
         out = self._probability(L=L, E=E, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino)
+
+        # back to CPU
         return Backend.from_device(self._squeeze_array(out))
+
+    def probability_sampled(self, L_km, E_GeV, n_samples, flavor_emit=None, flavor_det=None, antineutrino=False, E_sample_fct=None, L_sample_fct=None):
+        if E_sample_fct is None and L_sample_fct is None:
+            raise ValueError("Must specify either E_sample_fct or L_sample_fct")
+
+        # unify array format
+        L, E = self._generate_L_and_E_arrays(L_km, E_GeV)
+        flavor_emit = self._format_flavor_arg(flavor_emit)
+        flavor_det = self._format_flavor_arg(flavor_det)
+
+        # save the original number of entries
+        nE = E.shape[0]
+
+        # perform the sampling or repeat the value n_samples times
+        E_sampled = _sample_array(X=E, n_samples=n_samples, sampling_fct=E_sample_fct)
+        L_sampled = _sample_array(X=L, n_samples=n_samples, sampling_fct=L_sample_fct)
+
+        # unit conversion
+        L_sampled *= KM_TO_EVINV     # (nE*n_samples,)
+        E_sampled *= GEV_TO_EV       # (nE*n_samples,)
+
+        # compute probability
+        P_sampled = self._probability(L=L_sampled, E=E_sampled, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino)
+
+        # perform the averaging over n_samples
+        nFe, nFd = P_sampled.shape[-2], P_sampled.shape[-1]
+        P_sampled = P_sampled.reshape(nE, n_samples, nFe, nFd)  # (nE, n_samples, nFe, nFd)
+        P_sampled = Backend.xp().mean(P_sampled, axis=1)  # (nE, nFe, nFd)
+        return Backend.from_device(self._squeeze_array(P_sampled))
 
     def generate_initial_state(self, flavor_emit, E_GeV, antineutrino=False):
         E = Backend.xp().asarray(E_GeV) * GEV_TO_EV
@@ -82,8 +133,8 @@ class Oscillator:
         center_shape = Lc.shape
 
         # ---------- prepare flattened arrays ----------
-        E_flat = Ec.reshape(-1) * GEV_TO_EV
-        L_flat = Lc.reshape(-1) * KM_TO_EVINV
+        E_flat = Ec.reshape(-1)
+        L_flat = Lc.reshape(-1)
 
         return L_flat, E_flat
 
