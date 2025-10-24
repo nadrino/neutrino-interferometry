@@ -4,8 +4,10 @@ from nu_waves.models.spectrum import Spectrum
 from nu_waves.hamiltonian import vacuum
 from nu_waves.propagation.new_oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
+from nu_waves.globals.backend import Backend
 
-
+# import torch
+# Backend.set_api(torch, device='mps')
 
 
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
