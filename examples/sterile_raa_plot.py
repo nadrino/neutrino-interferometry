@@ -17,16 +17,18 @@ nBins_L = 200
 E_res = 0.05
 nSamples_E = 10000
 fixed_E = 0.003 # GeV
-L_km_list = np.logspace(-2, 2.5, nBins_L)
+L_km_list = np.logspace(-2, 2, nBins_L)
 
 # 3 flavors PMNS, PDG values (2025)
 osc_amplitude = 0.06 # amplitude as ~RAA
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49), (4, 1): np.arcsin(np.sqrt(osc_amplitude))/2}
 phases = {(1, 3): np.deg2rad(195)}
+dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428, (4, 1): 1}
 
 h = vacuum.Hamiltonian(
-    mixing_matrix=Mixing(n_neutrinos=4, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix(),
-    m2_array=Spectrum(n_neutrinos=4, m_lightest=0., dm2={(2, 1): 7.42e-5, (3, 2): 0.0024428, (4, 1): 1}).get_m2()
+    mixing=Mixing(n_neutrinos=4, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=4, dm2=dm2),
+    antineutrino=False
 )
 osc = Oscillator(hamiltonian=h)
 
@@ -52,9 +54,12 @@ P_ee = osc.probability_sampled(
 
 # now switching back to 3 flavors
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
+dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428}
+
 h = vacuum.Hamiltonian(
-    mixing_matrix=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix(),
-    m2_array=Spectrum(n_neutrinos=3, m_lightest=0., dm2={(2, 1): 7.42e-5, (3, 2): 0.0024428}).get_m2()
+    mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=3, dm2=dm2),
+    antineutrino=False
 )
 osc.hamiltonian = h
 

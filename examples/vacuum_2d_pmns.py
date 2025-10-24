@@ -11,8 +11,8 @@ import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
 from nu_waves.globals.backend import Backend
-import torch
-Backend.set_api(torch, device='mps')
+# import torch
+# Backend.set_api(torch, device='mps')
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
@@ -21,8 +21,9 @@ dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428}
 
 # oscillator
 h = vacuum.Hamiltonian(
-    mixing_matrix=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix(),
-    m2_array=Spectrum(n_neutrinos=3, m_lightest=0, dm2=dm2).get_m2()
+    mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=3, dm2=dm2),
+    antineutrino=False
 )
 osc = Oscillator(hamiltonian=h)
 
