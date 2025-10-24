@@ -7,7 +7,7 @@ class Mixing:
     Generic N-flavor neutrino mixing matrix definition.
     Angles (theta) and phases (delta, majorana) must be given explicitly.
     """
-    n_neutrinos: int = 3
+    n_neutrinos: int
     mixing_angles: dict = field(default_factory=dict)
     dirac_phases: dict = field(default_factory=dict)
     majorana_phases: list = field(default_factory=list)

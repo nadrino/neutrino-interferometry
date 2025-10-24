@@ -13,24 +13,28 @@ class Spectrum:
 
     Attributes
     ----------
-    m_lightest : float
+    _m_lightest : float
         Lightest mass in eV (optional, default 0)
-    dm2_matrix : np.ndarray
+    _dm2_matrix : np.ndarray
         Antisymmetric matrix of Δm²_ij = m_i² − m_j²
     """
 
     def __init__(self, n_neutrinos: int, dm2: dict = None, m_lightest: float = 0.0):
         if n_neutrinos < 2:
             raise ValueError("Number of mass states must be ≥ 2.")
-        self.m_lightest = float(m_lightest)
-        self.dm2_matrix = np.zeros((n_neutrinos, n_neutrinos), dtype=float)
+        self._m_lightest = float(m_lightest)
+        self._dm2_matrix = np.zeros((n_neutrinos, n_neutrinos), dtype=float)
 
         if dm2 is not None:
             self.set_dm2(dm2)
 
     @property
-    def n(self):
-        return self.dm2_matrix.shape[0]
+    def get_n_neutrinos(self):
+        return self._dm2_matrix.shape[0]
+
+    @property
+    def get_m_lightest(self):
+        return self._m_lightest
 
     # ---------- Input of Δm² ----------
     def set_dm2(self, dm2_dict: dict):
@@ -44,8 +48,8 @@ class Spectrum:
         seen_pairs = set()
         for (i, j), val in dm2_dict.items():
             # 1. Invalid or self-referencing indices
-            if not (1 <= i <= self.n and 1 <= j <= self.n):
-                raise IndexError(f"indices ({i},{j}) out of range for n={self.n}")
+            if not (1 <= i <= self.get_n_neutrinos and 1 <= j <= self.get_n_neutrinos):
+                raise IndexError(f"indices ({i},{j}) out of range for n={self.get_n_neutrinos}")
             if i == j:
                 raise ValueError(f"Invalid Δm²({i},{j}): i and j must differ.")
 
@@ -56,10 +60,10 @@ class Spectrum:
             seen_pairs.add((i, j))
 
         # 3. Too many independent entries (redundant information)
-        if len(seen_pairs) > self.n - 1:
+        if len(seen_pairs) > self.get_n_neutrinos - 1:
             raise ValueError(
-                f"Too many Δm² entries ({len(seen_pairs)}) for n={self.n}. "
-                f"Maximum independent differences is {self.n - 1}."
+                f"Too many Δm² entries ({len(seen_pairs)}) for n={self.get_n_neutrinos}. "
+                f"Maximum independent differences is {self.get_n_neutrinos - 1}."
             )
 
         # --- passed validation, ready for injection below ---
@@ -75,9 +79,9 @@ class Spectrum:
           - Slight inconsistencies are corrected (auto-heal).
         """
 
-        n = self.n
+        n = self.get_n_neutrinos
         tol = 1e-10
-        M = np.copy(self.dm2_matrix)
+        M = np.copy(self._dm2_matrix)
 
         # --- 1. Direct injection of user values ---
         for (i, j), val in dm2_dict.items():
@@ -130,12 +134,11 @@ class Spectrum:
                     M[j, i] = -expected
 
         # --- 6. Final antisymmetrization & store ---
-        self.dm2_matrix = 0.5 * (M - M.T)
-
+        self._dm2_matrix = 0.5 * (M - M.T)
 
     def get_dm2(self, i: int, j: int) -> float:
         """Return Δm²_ij = m_i² − m_j² (1-based indices)."""
-        return float(self.dm2_matrix[i-1, j-1])
+        return float(self._dm2_matrix[i - 1, j - 1])
 
     def get_m2(self):
         """
@@ -145,7 +148,7 @@ class Spectrum:
         The reference state (lightest) is identified automatically
         as the one with the smallest average m² offset.
         """
-        M = self.dm2_matrix
+        M = self._dm2_matrix
         n = M.shape[0]
 
         # --- identify lightest state (min mean Δm²) ---
@@ -154,7 +157,7 @@ class Spectrum:
         ref = np.argmin(mean_shift)  # index of lightest (0-based)
 
         # --- reconstruct absolute m² values ---
-        m2_lightest = self.m_lightest ** 2
+        m2_lightest = self._m_lightest ** 2
         m2 = m2_lightest + M[:, ref]
 
         # --- sanity checks ---
@@ -168,11 +171,11 @@ class Spectrum:
 
     # ---------- Utilities ----------
     def summary(self):
-        print(f"Spectrum with {self.n} mass states:")
-        print(f"  Lightest mass = {self.m_lightest:.6f} eV")
+        print(f"Spectrum with {self.get_n_neutrinos} mass states:")
+        print(f"  Lightest mass = {self._m_lightest:.6f} eV")
         print(f"  Masses = {np.round(self.get_m(), 6)} eV")
         print("Δm² matrix [eV²]:")
-        print(np.round(self.dm2_matrix, 6))
+        print(np.round(self._dm2_matrix, 6))
 
 
 if __name__ == "__main__":
