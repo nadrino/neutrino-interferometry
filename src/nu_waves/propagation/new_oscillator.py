@@ -29,8 +29,9 @@ class Oscillator:
         flavor_det = self._format_flavor_arg(flavor_det)
 
         # convert units
-        L *= KM_TO_EVINV
-        E *= GEV_TO_EV
+        # don't use `*=` since some duplicated numbers could refer to the same memory address
+        L = L * KM_TO_EVINV
+        E = E * GEV_TO_EV
 
         # compute probabilities
         out = self._probability(L=L, E=E, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino)
@@ -55,8 +56,8 @@ class Oscillator:
         L_sampled = _sample_array(X=L, n_samples=n_samples, sampling_fct=L_sample_fct)
 
         # unit conversion
-        L_sampled *= KM_TO_EVINV     # (nE*n_samples,)
-        E_sampled *= GEV_TO_EV       # (nE*n_samples,)
+        L_sampled = L_sampled * KM_TO_EVINV     # (nE*n_samples,)
+        E_sampled = E_sampled * GEV_TO_EV       # (nE*n_samples,)
 
         # compute probability
         P_sampled = self._probability(L=L_sampled, E=E_sampled, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino)
