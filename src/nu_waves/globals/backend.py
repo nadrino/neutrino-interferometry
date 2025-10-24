@@ -1,6 +1,4 @@
-from array_api_compat import get_namespace
 import numpy as np
-
 
 # static class
 class Backend:
