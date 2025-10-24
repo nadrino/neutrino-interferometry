@@ -1,4 +1,3 @@
-from nu_waves.backends import make_numpy_backend
 from nu_waves.utils.units import VCOEFF_EV
 from nu_waves.state.wave_function import WaveFunction, Basis
 from nu_waves.globals.backend import Backend
