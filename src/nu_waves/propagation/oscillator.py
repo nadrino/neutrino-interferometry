@@ -102,7 +102,7 @@ class Oscillator:
             return x.squeeze()
 
         # normalize preserve set with positive indices
-        ndim = x.ndim if hasattr(x, "ndim") else x.dim()
+        ndim = x.ndim if hasattr(x, "ndim") else x.n_neutrinos()
         if isinstance(preserve_axes, int):
             preserve_axes = (preserve_axes,)
         pres = set()

@@ -23,8 +23,8 @@ angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(
 phases = {(1, 3): np.deg2rad(195)}
 
 osc = Oscillator(
-    mixing_matrix=Mixing(dim=4, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix(),
-    m2_list=Spectrum(n=4, m_lightest=0., dm2={(2, 1): 7.42e-5, (3, 2): 0.0024428, (4, 1): dm2_sterile}).get_m2(),
+    mixing_matrix=Mixing(n_neutrinos=4, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix(),
+    m2_list=Spectrum(n_neutrinos=4, m_lightest=0., dm2={(2, 1): 7.42e-5, (3, 2): 0.0024428, (4, 1): dm2_sterile}).get_m2(),
     backend=torch_backend
 )
 xp = osc.backend.xp

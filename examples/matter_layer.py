@@ -9,11 +9,11 @@ import nu_waves.utils.flavors as flavors
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}
-pmns = Mixing(dim=3, mixing_angles=angles, dirac_phases=phases)
+pmns = Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases)
 U_pmns = pmns.get_mixing_matrix()
 
 # Masses, normal ordering
-spec = Spectrum(n=3, m_lightest=0.)
+spec = Spectrum(n_neutrinos=3, m_lightest=0.)
 spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
 # oscillator

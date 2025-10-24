@@ -19,11 +19,11 @@ class Spectrum:
         Antisymmetric matrix of Δm²_ij = m_i² − m_j²
     """
 
-    def __init__(self, n: int, m_lightest: float = 0.0, dm2: dict = None):
-        if n < 2:
+    def __init__(self, n_neutrinos: int, dm2: dict = None, m_lightest: float = 0.0):
+        if n_neutrinos < 2:
             raise ValueError("Number of mass states must be ≥ 2.")
         self.m_lightest = float(m_lightest)
-        self.dm2_matrix = np.zeros((n, n), dtype=float)
+        self.dm2_matrix = np.zeros((n_neutrinos, n_neutrinos), dtype=float)
 
         if dm2 is not None:
             self.set_dm2(dm2)
@@ -178,7 +178,7 @@ class Spectrum:
 if __name__ == "__main__":
 
     print("Providing 2,1 and 3,1:")
-    spec = Spectrum(n=3, m_lightest=0.01)
+    spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
     spec.set_dm2({
         (2, 1): 7.42e-5,
         (3, 1): 2.517e-3
@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     # coherence tests
     print("Providing 2,1 and 3,2:")
-    spec = Spectrum(n=3, m_lightest=0.01)
+    spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
     spec.set_dm2({
         (2, 1): 7.42e-5,
         (3, 2): 0.0024428
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     print("Δm²_32 =", spec.get_dm2(3, 2))
 
     print("Providing 3,1 and 3,2:")
-    spec = Spectrum(n=3, m_lightest=0.01)
+    spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
     spec.set_dm2({
         (3, 1): 2.517e-3,
         (3, 2): 0.0024428
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     print("Δm²_32 =", spec.get_dm2(3, 2))
 
     print("With sterile:")
-    spec = Spectrum(n=4, m_lightest=0.01)
+    spec = Spectrum(n_neutrinos=4, m_lightest=0.01)
     spec.set_dm2({
         (3, 1): 2.517e-3,
         (3, 2): 0.0024428,

@@ -24,8 +24,8 @@ dm2 = {(2, 1): 1}
 
 # oscillator
 h = vacuum.Hamiltonian(
-    mixing_matrix=Mixing(dim=n_neutrinos, mixing_angles=angles).get_mixing_matrix(),
-    m2_array=Spectrum(n=n_neutrinos, m_lightest=0, dm2=dm2).get_m2()
+    mixing_matrix=Mixing(n_neutrinos=n_neutrinos, mixing_angles=angles).get_mixing_matrix(),
+    m2_array=Spectrum(n_neutrinos=n_neutrinos, m_lightest=0, dm2=dm2).get_m2()
 )
 osc = Oscillator(hamiltonian=h)
 

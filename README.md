@@ -49,12 +49,12 @@ import nu_waves.utils.flavors as flavors
 # sterile test
 osc_amplitude = 0.1  # sin^2(2\theta)
 angles = {(1, 2): np.arcsin(np.sqrt(osc_amplitude)) / 2}
-pmns = Mixing(dim=2, mixing_angles=angles)
+pmns = Mixing(n_neutrinos=2, mixing_angles=angles)
 U_pmns = pmns.get_mixing_matrix()
 print(np.round(U_pmns, 3))
 
 # 1 eV^2
-spec = Spectrum(n=2, m_lightest=0.)
+spec = Spectrum(n_neutrinos=2, m_lightest=0.)
 spec.set_dm2({(2, 1): 1})
 spec.summary()
 m2_diag = np.diag(spec.get_m2())
