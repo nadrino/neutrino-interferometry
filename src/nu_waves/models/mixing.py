@@ -15,9 +15,9 @@ class Mixing:
           majorana_phases: dict = None
     ):
         self.n_neutrinos = n_neutrinos
-        self.mixing_angles = mixing_angles
-        self.dirac_phases = dirac_phases
-        self.majorana_phases = majorana_phases
+        self.mixing_angles = mixing_angles if mixing_angles is not None else dict()
+        self.dirac_phases = dirac_phases if dirac_phases is not None else dict()
+        self.majorana_phases = majorana_phases if majorana_phases is not None else dict()
 
     def build_mixing_matrix(self, include_majorana: bool = False):
         """
