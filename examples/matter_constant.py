@@ -7,17 +7,12 @@ from nu_waves.propagation.oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
-# backend = None
-backend = make_torch_backend(
-    force_device="cpu"
-)
-
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}
 pmns = Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases)
-U_pmns = pmns.get_mixing_matrix()
+U_pmns = pmns.build_mixing_matrix()
 
 # Masses, normal ordering
 spec = Spectrum(n_neutrinos=3, m_lightest=0.)
