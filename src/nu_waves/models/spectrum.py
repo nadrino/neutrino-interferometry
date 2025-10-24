@@ -23,33 +23,47 @@ class Spectrum:
         if n_neutrinos < 2:
             raise ValueError("Number of mass states must be ≥ 2.")
         self._m_lightest = float(m_lightest)
-        self._dm2_matrix = np.zeros((n_neutrinos, n_neutrinos), dtype=float)
-
-        if dm2 is not None:
-            self.set_dm2(dm2)
+        self._n_neutrinos = n_neutrinos
+        self._dm2_dict = dm2
+        # init
+        self._generate_dm2_matrix()
 
     @property
-    def get_n_neutrinos(self):
-        return self._dm2_matrix.shape[0]
+    def n_neutrinos(self):
+        return self._n_neutrinos
 
     @property
     def get_m_lightest(self):
         return self._m_lightest
 
+    def set_dm2(self, dm2: dict):
+        for (i, j), val in dm2.items():
+            self._dm2_dict[(i, j)] = val
+        self._generate_dm2_matrix()
+
     # ---------- Input of Δm² ----------
-    def set_dm2(self, dm2_dict: dict):
+    def _generate_dm2_matrix(self):
         """
         Set Δm²_ij values, checking for consistency and redundancy.
         Example:
             spec.set_dm2({(2,1): 7.4e-5, (3,1): 2.517e-3})
         """
+        # init
+        self._dm2_matrix = np.zeros((self._n_neutrinos, self._n_neutrinos), dtype=float)
+
+        # leave is not set
+        if self._dm2_dict is None:
+            return
 
         # --- Loop over entries to validate indices and redundancy ---
         seen_pairs = set()
-        for (i, j), val in dm2_dict.items():
+        for (i, j), val in self._dm2_dict.items():
+            # 0. Manually invalidated
+            if val is None:
+                continue
             # 1. Invalid or self-referencing indices
-            if not (1 <= i <= self.get_n_neutrinos and 1 <= j <= self.get_n_neutrinos):
-                raise IndexError(f"indices ({i},{j}) out of range for n={self.get_n_neutrinos}")
+            if not (1 <= i <= self.n_neutrinos and 1 <= j <= self.n_neutrinos):
+                raise IndexError(f"indices ({i},{j}) out of range for n={self.n_neutrinos}")
             if i == j:
                 raise ValueError(f"Invalid Δm²({i},{j}): i and j must differ.")
 
@@ -60,10 +74,10 @@ class Spectrum:
             seen_pairs.add((i, j))
 
         # 3. Too many independent entries (redundant information)
-        if len(seen_pairs) > self.get_n_neutrinos - 1:
+        if len(seen_pairs) > self.n_neutrinos - 1:
             raise ValueError(
-                f"Too many Δm² entries ({len(seen_pairs)}) for n={self.get_n_neutrinos}. "
-                f"Maximum independent differences is {self.get_n_neutrinos - 1}."
+                f"Too many Δm² entries ({len(seen_pairs)}) for n={self.n_neutrinos}. "
+                f"Maximum independent differences is {self.n_neutrinos - 1}."
             )
 
         # --- passed validation, ready for injection below ---
@@ -79,12 +93,12 @@ class Spectrum:
           - Slight inconsistencies are corrected (auto-heal).
         """
 
-        n = self.get_n_neutrinos
+        n = self.n_neutrinos
         tol = 1e-10
         M = np.copy(self._dm2_matrix)
 
         # --- 1. Direct injection of user values ---
-        for (i, j), val in dm2_dict.items():
+        for (i, j), val in self._dm2_dict.items():
             M[i - 1, j - 1] = val
             M[j - 1, i - 1] = -val
 
@@ -136,6 +150,9 @@ class Spectrum:
         # --- 6. Final antisymmetrization & store ---
         self._dm2_matrix = 0.5 * (M - M.T)
 
+    def get_dm2_matrix(self):
+        return self._dm2_matrix
+
     def get_dm2(self, i: int, j: int) -> float:
         """Return Δm²_ij = m_i² − m_j² (1-based indices)."""
         return float(self._dm2_matrix[i - 1, j - 1])
@@ -171,7 +188,7 @@ class Spectrum:
 
     # ---------- Utilities ----------
     def summary(self):
-        print(f"Spectrum with {self.get_n_neutrinos} mass states:")
+        print(f"Spectrum with {self.n_neutrinos} mass states:")
         print(f"  Lightest mass = {self._m_lightest:.6f} eV")
         print(f"  Masses = {np.round(self.get_m(), 6)} eV")
         print("Δm² matrix [eV²]:")
@@ -182,7 +199,7 @@ if __name__ == "__main__":
 
     print("Providing 2,1 and 3,1:")
     spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
-    spec.set_dm2({
+    spec._generate_dm2_matrix({
         (2, 1): 7.42e-5,
         (3, 1): 2.517e-3
     })
@@ -194,7 +211,7 @@ if __name__ == "__main__":
     # coherence tests
     print("Providing 2,1 and 3,2:")
     spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
-    spec.set_dm2({
+    spec._generate_dm2_matrix({
         (2, 1): 7.42e-5,
         (3, 2): 0.0024428
     })
@@ -205,7 +222,7 @@ if __name__ == "__main__":
 
     print("Providing 3,1 and 3,2:")
     spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
-    spec.set_dm2({
+    spec._generate_dm2_matrix({
         (3, 1): 2.517e-3,
         (3, 2): 0.0024428
     })
@@ -215,7 +232,7 @@ if __name__ == "__main__":
     print("Δm²_32 =", spec.get_dm2(3, 2))
 
     print("Inverted ordering:")
-    spec.set_dm2({
+    spec._generate_dm2_matrix({
         (2, 1): 7.42e-5,
         (3, 1): -2.517e-3
     })
@@ -226,7 +243,7 @@ if __name__ == "__main__":
 
     print("With sterile:")
     spec = Spectrum(n_neutrinos=4, m_lightest=0.01)
-    spec.set_dm2({
+    spec._generate_dm2_matrix({
         (3, 1): 2.517e-3,
         (3, 2): 0.0024428,
         (4, 1): 1,

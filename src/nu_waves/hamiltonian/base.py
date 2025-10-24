@@ -14,16 +14,20 @@ class HamiltonianBase(ABC):
         self._check_parameters()
 
     @property
-    def get_n_flavors(self):
+    def n_flavors(self):
         return self._mixing.n_neutrinos
 
     @property
-    def get_mixing(self):
+    def mixing(self):
         return self._mixing
 
     @property
-    def get_spectrum(self):
+    def spectrum(self):
         return self._spectrum
+
+    def set_spectrum(self, spectrum: Spectrum):
+        self._spectrum = spectrum
+        self._check_parameters()
 
     # Default: produce S(L) in FLAVOR basis
     @abstractmethod
@@ -43,4 +47,4 @@ class HamiltonianBase(ABC):
         psi.values = (S @ psi.values[..., None])[..., 0]    # (nE,nF)
 
     def _check_parameters(self):
-        assert (self._spectrum.get_n_neutrinos == self._mixing.n_neutrinos)
+        assert (self._spectrum.n_neutrinos == self._mixing.n_neutrinos)

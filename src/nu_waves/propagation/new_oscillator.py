@@ -78,7 +78,7 @@ class Oscillator:
         psi = self._generate_initial_state(flavor_emit=flavor_emit, E=E, antineutrino=antineutrino)
         self.hamiltonian.propagate_state(psi=psi, L=L, E=E) # return the state in flavor basis
 
-        nF = self.hamiltonian.get_n_flavors
+        nF = self.hamiltonian.n_flavors
         nFd = len(flavor_det)
         flavor_det_vecs = Backend.xp().zeros((nFd, nF), dtype=Backend.complex_dtype())
         flavor_det_vecs[Backend.xp().arange(nFd), flavor_det] = 1.0  # (nFd, nF)
@@ -88,7 +88,7 @@ class Oscillator:
     def _generate_initial_state(self, flavor_emit, E, antineutrino) -> WaveFunction:
         xp = Backend.xp()
         nE = E.shape[0]
-        nF = self.hamiltonian.get_n_flavors
+        nF = self.hamiltonian.n_flavors
         nFe = len(flavor_emit)
 
         # Create zero-filled wavefunction array
@@ -147,7 +147,7 @@ class Oscillator:
         """
         xp = Backend.xp()
         if arg is None:
-            return list(range(int(self.hamiltonian.get_n_flavors)))
+            return list(range(int(self.hamiltonian.n_flavors)))
 
         if isinstance(arg, int):
             out = [int(arg)]

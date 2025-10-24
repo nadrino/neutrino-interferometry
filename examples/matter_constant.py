@@ -16,7 +16,7 @@ U_pmns = pmns.build_mixing_matrix()
 
 # Masses, normal ordering
 spec = Spectrum(n_neutrinos=3, m_lightest=0.)
-spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
+spec._generate_dm2_matrix({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
 # oscillator
 osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=backend)
@@ -66,7 +66,7 @@ plt.show()
 
 # inverted ordering?
 spec = Spectrum(n_neutrinos=3, m_lightest=0.)
-spec.set_dm2({(2, 1): 7.42e-5, (3, 2): -0.0024428})
+spec._generate_dm2_matrix({(2, 1): 7.42e-5, (3, 2): -0.0024428})
 
 # oscillator
 osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())

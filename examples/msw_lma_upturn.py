@@ -31,7 +31,7 @@ angles = {(1, 2): np.deg2rad(33.68), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad
 phases = {(1, 3): np.deg2rad(195)}
 
 spec = Spectrum(n_neutrinos=3, m_lightest=0.)
-spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
+spec._generate_dm2_matrix({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
 U = Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix()
 osc = Oscillator(mixing_matrix=U, m2_list=spec.get_m2(), backend=torch_backend)

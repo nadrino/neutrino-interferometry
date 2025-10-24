@@ -1,16 +1,23 @@
 from nu_waves.globals.backend import Backend
 from dataclasses import dataclass, field
 
-@dataclass
+
 class Mixing:
     """
     Generic N-flavor neutrino mixing matrix definition.
     Angles (theta) and phases (delta, majorana) must be given explicitly.
     """
-    n_neutrinos: int
-    mixing_angles: dict = field(default_factory=dict)
-    dirac_phases: dict = field(default_factory=dict)
-    majorana_phases: list = field(default_factory=list)
+    def __init__(
+          self,
+          n_neutrinos: int,
+          mixing_angles: dict = None,
+          dirac_phases: dict = None,
+          majorana_phases: dict = None
+    ):
+        self.n_neutrinos = n_neutrinos
+        self.mixing_angles = mixing_angles
+        self.dirac_phases = dirac_phases
+        self.majorana_phases = majorana_phases
 
     def build_mixing_matrix(self, include_majorana: bool = False):
         """
@@ -25,20 +32,20 @@ class Mixing:
 
         # Build the ordered list of rotation pairs to apply (right-multiplication)
         provided = list(self.mixing_angles.keys())  # preserves insertion order (Py3.7+)
-        order: list[tuple[int, int]] = []
+        angles_ordered: list[tuple[int, int]] = []
 
         if self.n_neutrinos >= 3:
             pdg_triple = [(2, 3), (1, 3), (1, 2)]
             # First, apply PDG order for those pairs that are actually provided
-            order.extend([p for p in pdg_triple if p in self.mixing_angles])
+            angles_ordered.extend([p for p in pdg_triple if p in self.mixing_angles])
 
         # Then append all the remaining pairs as provided (without sorting)
-        order.extend([p for p in provided if p not in order])
+        angles_ordered.extend([p for p in provided if p not in angles_ordered])
 
         # Apply rotations in that order (right-multiply: rotations act on mass columns)
-        for (i, j) in order:
-            theta = self.mixing_angles[(i, j)]
-            delta = self.dirac_phases.get((i, j), 0.0)
+        for (i, j) in angles_ordered:
+            theta = Backend.xp().asarray(self.mixing_angles[(i, j)])
+            delta = Backend.xp().asarray(self.dirac_phases.get((i, j), 0.0))
             s, c = Backend.xp().sin(theta), Backend.xp().cos(theta)
 
             R = Backend.xp().eye(self.n_neutrinos, dtype=Backend.xp().complex128)

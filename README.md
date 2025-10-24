@@ -55,7 +55,7 @@ print(np.round(U_pmns, 3))
 
 # 1 eV^2
 spec = Spectrum(n_neutrinos=2, m_lightest=0.)
-spec.set_dm2({(2, 1): 1})
+spec._generate_dm2_matrix({(2, 1): 1})
 spec.summary()
 m2_diag = np.diag(spec.get_m2())
 
