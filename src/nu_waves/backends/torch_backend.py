@@ -14,6 +14,9 @@ class TorchBackend:
     def asarray(self, x, dtype=None):
         return torch.as_tensor(x, dtype=dtype)
 
+    def copy(self, x):
+        return x.clone()
+
     def conjugate(self, x):
         return torch.conj(x)
 
