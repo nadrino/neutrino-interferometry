@@ -9,8 +9,12 @@ class Hamiltonian(HamiltonianBase):
     def __init__(self, mixing: Mixing, spectrum: Spectrum, antineutrino: bool):
         super().__init__(mixing=mixing, spectrum=spectrum, antineutrino=antineutrino)
 
-    def propagate_state(self, psi: WaveFunction, L, E=None):
+    def propagate_state(self, psi: WaveFunction, L, E):
         xp = Backend().xp()
+
+        # make sure they are matching the backend (no copy if already matching)
+        E = xp.asarray(E)
+        L = xp.asarray(L)
 
         U = self._mixing.build_mixing_matrix()
         Ud = xp.conjugate(U.T)
