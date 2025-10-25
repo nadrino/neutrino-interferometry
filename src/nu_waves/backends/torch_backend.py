@@ -2,6 +2,10 @@ import torch
 
 class TorchBackend:
 
+    def __init__(self):
+        pass
+        # torch.autograd.grad_mode.inference_mode(mode=False)
+
     """Subset of Array-API interface mapped to torch."""
     def __getattr__(self, name):
         # delegate to torch if it exists
