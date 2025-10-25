@@ -29,15 +29,18 @@ class HamiltonianBase(ABC):
         self._spectrum = spectrum
         self._check_parameters()
 
+    def set_antineutrino(self, antineutrino: bool):
+        self._antineutrino = antineutrino
+
     # Default: produce S(L) in FLAVOR basis
     @abstractmethod
-    def get_barger_propagator(self, L, E=None) -> any:
+    def get_barger_propagator(self, L, E) -> any:
         """Return S(L) in FLAVOR basis, shape (nE, nF, nF)."""
         ...
 
     # Generic propagation (can be overridden for faster calculations)
     # psi returned should be expressed in the flavor basis
-    def propagate_state(self, psi: WaveFunction, L, E=None):
+    def propagate_state(self, psi: WaveFunction, L, E):
         # Ensure ψ is in a flavor basis for the default path
         if psi.current_basis != Basis.FLAVOR:
             raise ValueError("Default Hamiltonian expects psi in FLAVOR basis. "
