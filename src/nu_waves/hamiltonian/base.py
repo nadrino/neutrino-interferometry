@@ -46,8 +46,8 @@ class HamiltonianBase(ABC):
             raise ValueError("Default Hamiltonian expects psi in FLAVOR basis. "
                              "Override propagate_state in your subclass, or rotate ψ beforehand.")
 
-        S = self.get_barger_propagator(L=L, E=E)                       # (nE,nF,nF), flavor basis
-        psi.values = (S @ psi.values[..., None])[..., 0]    # (nE,nF)
+        S = self.get_barger_propagator(L=L, E=E)
+        psi.values = (S[:, None, :, :] @ psi.values[..., :, None])[..., 0]
 
     def _check_parameters(self):
         assert (self._spectrum.n_neutrinos == self._mixing.n_neutrinos)
