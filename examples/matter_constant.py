@@ -69,8 +69,8 @@ P_muebar_matt = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)
 # --- Plot ---
 plt.figure(figsize=(7,4.2))
 plt.plot(E, P_mue_vac,  label=r"$\nu_\mu\!\to\!\nu_e$ (vacuum)", lw=2)
-# plt.plot(E, P_mue_matt, label=r"$\nu_\mu\!\to\!\nu_e$ (matter)", lw=2)
-# plt.plot(E, P_muebar_matt, ":", label=r"$\bar\nu_\mu\!\to\!\bar\nu_e$ (matter)", lw=2)
+plt.plot(E, P_mue_matt, label=r"$\nu_\mu\!\to\!\nu_e$ (matter)", lw=2)
+plt.plot(E, P_muebar_matt, ":", label=r"$\bar\nu_\mu\!\to\!\bar\nu_e$ (matter)", lw=2)
 
 plt.xlabel(r"$E_\nu$ [GeV]")
 plt.ylabel("Probability")
@@ -79,26 +79,27 @@ plt.xlim(E.min(), E.max())
 plt.ylim(0, 0.3)
 plt.legend(ncol=2, frameon=False)
 plt.tight_layout()
+plt.savefig("../figures/matter_vacuum_vs_matter.jpg", dpi=150)  if not os.environ.get("CI") else None
 plt.show()
 
 
-# # inverted ordering
-# h_matter_constant.spectrum.set_dm2({(2, 1): 7.42e-5, (3, 2): -0.0024428})
-# h_matter_constant.set_antineutrino(False)
-# P_mue_matt_inv = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)
-#
-# plt.figure(figsize=(7,4.2))
-# plt.plot(E, P_mue_matt, label=r"$\nu_\mu\!\to\!\nu_e$ (matter) NO", lw=2)
-# plt.plot(E, P_mue_matt_inv, label=r"$\nu_\mu\!\to\!\nu_e$ (matter) IO", lw=2)
-#
-# plt.xlabel(r"$E_\nu$ [GeV]")
-# plt.ylabel("Probability")
-# plt.title("DUNE-like oscillation, L=1300 km (vacuum vs matter)")
-# plt.xlim(E.min(), E.max())
-# plt.ylim(0, 0.3)
-# plt.legend(ncol=2, frameon=False)
-# plt.tight_layout()
-#
-# plt.savefig("../figures/matter_constant_test.jpg", dpi=150)  if not os.environ.get("CI") else None
-# plt.show()
+# inverted ordering
+h_matter_constant.spectrum.set_dm2({(2, 1): 7.42e-5, (3, 2): -0.0024428})
+h_matter_constant.set_antineutrino(False)
+P_mue_matt_inv = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)
+
+plt.figure(figsize=(7,4.2))
+plt.plot(E, P_mue_matt, label=r"$\nu_\mu\!\to\!\nu_e$ (matter) NO", lw=2)
+plt.plot(E, P_mue_matt_inv, label=r"$\nu_\mu\!\to\!\nu_e$ (matter) IO", lw=2)
+
+plt.xlabel(r"$E_\nu$ [GeV]")
+plt.ylabel("Probability")
+plt.title("DUNE-like oscillation, L=1300 km (vacuum vs matter)")
+plt.xlim(E.min(), E.max())
+plt.ylim(0, 0.3)
+plt.legend(ncol=2, frameon=False)
+plt.tight_layout()
+
+plt.savefig("../figures/matter_constant_test.jpg", dpi=150)  if not os.environ.get("CI") else None
+plt.show()
 
