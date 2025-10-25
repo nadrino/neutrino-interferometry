@@ -28,8 +28,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch = ["torch>=2.0"] # `pip install nu-waves[torch]` but not strictly a dependency
-dev = ["matplotlib>=3.7","torch>=2.0", "pytest", "pytest-cov"] # CI will install: `pip install .[dev]`
+torch = [
+    # `pip install nu-waves[torch]` but not strictly a dependency
+    "torch>=2.0"
+]
+plot = [
+    "matplotlib>=3.7"
+]
+# CI will install: `pip install .[dev]`
+dev = [
+    "pytest",
+    "pytest-cov"
+]
 
 
 [project.urls]
