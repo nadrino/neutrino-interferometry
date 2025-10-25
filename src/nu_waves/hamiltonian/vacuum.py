@@ -46,15 +46,11 @@ class Hamiltonian(HamiltonianBase):
             eigen_vectors_dagger=U
         )
 
-    def get_barger_propagator(self, L, E=None):
+    def get_barger_propagator(self, L, E):
         xp = Backend().xp()
 
         U = self._mixing.build_mixing_matrix()
         Ud = xp.conjugate(U.T)
-
-        if self._antineutrino:
-            U = xp.conjugate(U)
-            Ud = xp.conjugate(Ud)
 
         phases = 1.267 * (L / E)[:, None] * self._spectrum.get_m2()[None, :]
         D = xp.exp(-1j * phases)
