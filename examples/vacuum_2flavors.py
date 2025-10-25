@@ -37,7 +37,6 @@ P = osc.probability(
     L_km=L_list, E_GeV=E_fixed,
     flavor_emit=flavors.electron,
     flavor_det=flavors.electron, # muon could be sterile
-    antineutrino=True
 )
 
 
@@ -56,7 +55,6 @@ P_damp = osc.probability_sampled(
     L_km=L_list, E_GeV=E_fixed,
     flavor_emit=flavors.electron,
     flavor_det=flavors.electron, # muon could be sterile
-    antineutrino=True,
     n_samples=nSamples_E,
     E_sample_fct=gaussian_E_sampler,
 )
