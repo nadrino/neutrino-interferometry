@@ -11,10 +11,7 @@ class Backend:
     @classmethod
     def set_api(cls, module, device=None, real_dtype=None, complex_dtype=None):
         """Set xp backend: numpy, torch, cupy, jax.numpy, etc."""
-        import numpy as np
-        import torch
-
-        if module is torch:
+        if module.__name__ == "torch":
             from nu_waves.backends.torch_backend import TorchBackend
             cls._current_api = TorchBackend()
         else:

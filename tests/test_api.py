@@ -1,5 +1,4 @@
 import importlib
-import math
 
 def test_import():
     m = importlib.import_module("nu_waves")

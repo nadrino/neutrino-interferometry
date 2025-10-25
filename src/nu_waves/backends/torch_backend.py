@@ -1,6 +1,5 @@
 import torch
 
-
 class TorchBackend:
 
     """Subset of Array-API interface mapped to torch."""
@@ -37,7 +36,6 @@ class TorchBackend:
 
     def repeat(self, a, repeats, axis=None):
         """NumPy-style repeat for torch backend."""
-        import torch
         if not torch.is_tensor(a):
             a = torch.as_tensor(a)
 
