@@ -28,7 +28,7 @@ class MatterProfile:
 
     @staticmethod
     def from_segments(rho_gcm3, Ye, lengths_km) -> "MatterProfile":
-        Ls = [MatterLayer(r, y, L * KM_TO_EVINV) for r, y, L in zip(rho_gcm3, Ye, lengths_km)]
+        Ls = [MatterLayer(r, y, L) for r, y, L in zip(rho_gcm3, Ye, lengths_km)]
         return MatterProfile(Ls, "absolute")
 
     def resolve_dL(self, L_in_eV_inv) -> list[Backend.xp().ndarray]:
@@ -45,7 +45,7 @@ class MatterProfile:
                 dLs.append(layer.weight * Ltot)
         elif self.slicing == "absolute":
             for layer in self.layers:
-                dLs.append(Backend.xp().full_like(Ltot, layer.weight, dtype=float))
+                dLs.append(Backend.xp().full_like(Ltot, layer.weight * KM_TO_EVINV, dtype=float))
         else:
             raise NotImplementedError("slicing must be 'fraction' or 'absolute'")
 
