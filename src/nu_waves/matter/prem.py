@@ -193,4 +193,4 @@ class PREMModel:
         if not layers:
             layers = [MatterLayer(0.0, self.Ye_mantle, 0.0)]
 
-        return MatterProfile(layers=layers, slicing="fraction")
+        return MatterProfile(layers=layers, slicing="absolute")
