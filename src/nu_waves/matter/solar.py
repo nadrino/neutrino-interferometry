@@ -141,7 +141,7 @@ def exit_mass_fractions_single(
     s_end = float(max(R_SUN - r_emit_km, 0.0))
     if s_end == 0.0:
         # Emission at surface: already in vacuum eigenbasis
-        F_last = np.zeros(osc.dim)
+        F_last = np.zeros(osc._n_neutrinos)
         F_last[:] = 0.0
         F_last[0] = 1.0  # if you emitted a pure νe at the surface
         return F_last

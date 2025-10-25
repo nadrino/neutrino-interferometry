@@ -4,7 +4,6 @@ import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
 
-from nu_waves.backends import make_torch_mps_backend
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
@@ -13,7 +12,7 @@ import nu_waves.utils.style
 
 # toggle for CPU/GPU
 # torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 URL = "https://www.sns.ias.edu/~jnb/SNdata/Export/BS2005/bs05_agsop.dat"
 DATA_DIR = Path("./data/ssm")
@@ -34,11 +33,11 @@ angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(
 phases = {(1, 3): np.deg2rad(195)}
 
 # Masses, normal ordering
-spec = Spectrum(n=3, m_lightest=0.)
-spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
+spec = Spectrum(n_neutrinos=3, m_lightest=0.)
+spec._generate_dm2_matrix({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
 osc = Oscillator(
-    mixing_matrix=Mixing(dim=3, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix(),
+    mixing_matrix=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix(),
     m2_list=spec.get_m2(),
     backend=torch_backend
 )

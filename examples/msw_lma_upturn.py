@@ -12,11 +12,10 @@ from nu_waves.matter.solar import (
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
-from nu_waves.backends.torch_backend import make_torch_mps_backend
 from nu_waves.matter.solar import load_bs05_agsop # solar model
 
 # torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 # --- 0) User knobs
 SOURCE = SolarSource.B8
@@ -31,10 +30,10 @@ theta_12 = [33.68-0.70, 33.68+0.73]
 angles = {(1, 2): np.deg2rad(33.68), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}
 
-spec = Spectrum(n=3, m_lightest=0.)
-spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
+spec = Spectrum(n_neutrinos=3, m_lightest=0.)
+spec._generate_dm2_matrix({(2, 1): 7.42e-5, (3, 2): 0.0024428})
 
-U = Mixing(dim=3, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix()
+U = Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix()
 osc = Oscillator(mixing_matrix=U, m2_list=spec.get_m2(), backend=torch_backend)
 
 sol = load_bs05_agsop("./data/ssm/bs05_agsop.dat")

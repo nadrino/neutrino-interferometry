@@ -3,69 +3,76 @@ import os
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import Oscillator
-from nu_waves.backends.torch_backend import make_torch_mps_backend
+from nu_waves.hamiltonian import vacuum
+from nu_waves.propagation.new_oscillator import Oscillator
+from nu_waves.globals.backend import Backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
-# toggle GPU
-# torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+import torch
+Backend.set_api(torch, device='mps')
+
 
 nBins_L = 200
-nSamples_E = 1000
+E_res = 0.05
+nSamples_E = 10000
 fixed_E = 0.003 # GeV
-L_km_list = np.logspace(-2, 2.5, nBins_L)
+L_km_list = np.logspace(-2, 2, nBins_L)
 
 # 3 flavors PMNS, PDG values (2025)
 osc_amplitude = 0.06 # amplitude as ~RAA
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49), (4, 1): np.arcsin(np.sqrt(osc_amplitude))/2}
 phases = {(1, 3): np.deg2rad(195)}
+dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428, (4, 1): 1}
 
-osc = Oscillator(
-    mixing_matrix=Mixing(dim=4, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix(),
-    m2_list=Spectrum(n=4, m_lightest=0., dm2={(2, 1): 7.42e-5, (3, 2): 0.0024428, (4, 1): 1}).get_m2()
+h = vacuum.Hamiltonian(
+    mixing=Mixing(n_neutrinos=4, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=4, dm2=dm2),
+    antineutrino=False
 )
-xp = osc.backend.xp
+osc = Oscillator(hamiltonian=h)
+
+# Example: fractional Gaussian energy resolution and fixed baseline blur
+def gaussian_E_sampler(E, n_samples, sigma_rel=E_res):
+    # E: (nE,)
+    xp = Backend.xp()
+    noise = sigma_rel * xp.abs(E)[:, None] * xp.asarray(
+        xp.random.standard_normal((E.shape[0], n_samples)), dtype=Backend.real_dtype()
+    )
+    out = E[:, None] + noise
+    return xp.maximum(out, xp.asarray(1e-12, dtype=Backend.real_dtype()))
 
 
-def energy_sampler_sqrt(E_center, n, a=0.004):
-    """
-    Gaussian energy smearing with sigma(E) = a * sqrt(E).
-    - E_center: scalar/array/grid of energies [GeV]
-    - n: number of samples
-    - a: resolution scale [GeV**0.5] (e.g. a=0.08 ⇒ 8% at 1 GeV)
-
-    Returns: samples with shape E_center.shape + (n,)
-    """
-    E = xp.asarray(E_center, dtype=float)
-    # avoid sqrt of negatives; also avoids zero-variance at E=0
-    E_safe = xp.maximum(E, 1e-12)
-    sigma = a * xp.sqrt(E_safe)
-    out = xp.normal(loc=E[..., None], scale=sigma[..., None], size=E.shape + (n,))
-    return out
-
-
-osc.energy_sampler = energy_sampler_sqrt
-osc.n_samples = nSamples_E
-P_ee = osc.probability(
+P_ee = osc.probability_sampled(
     L_km=L_km_list, E_GeV=fixed_E,
-    alpha=flavors.electron,
-    beta=flavors.electron, # muon could be sterile
-    antineutrino=True
+    flavor_emit=flavors.electron,
+    flavor_det=flavors.electron,
+    antineutrino=True,
+    n_samples=nSamples_E,
+    E_sample_fct=gaussian_E_sampler,
 )
 
+# now switching back to 3 flavors
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
-osc.set_parameters(
-    mixing_matrix=Mixing(dim=3, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix(),
-    m2_list=Spectrum(n=3, m_lightest=0., dm2={(2, 1): 7.42e-5, (3, 2): 0.0024428}).get_m2()
-)
+dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428}
 
-P_ee_orig = osc.probability(
+h = vacuum.Hamiltonian(
+    mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=3, dm2=dm2),
+    antineutrino=False
+)
+osc.hamiltonian = h
+
+
+
+
+P_ee_orig = osc.probability_sampled(
     L_km=L_km_list, E_GeV=fixed_E,
-    alpha=flavors.electron,
-    beta=flavors.electron, # muon could be sterile
-    antineutrino=True
+    flavor_emit=flavors.electron,
+    flavor_det=flavors.electron,
+    antineutrino=True,
+    n_samples=nSamples_E,
+    E_sample_fct=gaussian_E_sampler,
 )
 
 

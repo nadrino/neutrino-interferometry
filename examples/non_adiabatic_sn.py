@@ -13,11 +13,11 @@ dm31 = 2.517e-3    # eV^2
 E_MeV = 10.0
 
 angles = {(1, 2): theta12, (1, 3): theta13, (2, 3): 0.0}
-pmns = Mixing(dim=3, mixing_angles=angles)
-U = pmns.get_mixing_matrix()
+pmns = Mixing(n_neutrinos=3, mixing_angles=angles)
+U = pmns.build_mixing_matrix()
 
-spec = Spectrum(n=3, m_lightest=0.0)
-spec.set_dm2({(2, 1): dm21, (3, 1): dm31})
+spec = Spectrum(n_neutrinos=3, m_lightest=0.0)
+spec._generate_dm2_matrix({(2, 1): dm21, (3, 1): dm31})
 m2 = spec.get_m2()
 
 # ---- 1) Locate the H-resonance on a smooth profile (no shock) ----

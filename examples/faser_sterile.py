@@ -4,13 +4,12 @@ import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.propagation.oscillator import Oscillator
-from nu_waves.backends.torch_backend import make_torch_mps_backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
 # toggle GPU
 # torch_backend = None
-torch_backend = make_torch_mps_backend(seed=0, use_complex64=True)
+torch_backend = make_torch_backend(seed=0, use_complex64=True)
 
 nBins_E = 100
 nSamples_E = 1000
@@ -24,8 +23,8 @@ angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(
 phases = {(1, 3): np.deg2rad(195)}
 
 osc = Oscillator(
-    mixing_matrix=Mixing(dim=4, mixing_angles=angles, dirac_phases=phases).get_mixing_matrix(),
-    m2_list=Spectrum(n=4, m_lightest=0., dm2={(2, 1): 7.42e-5, (3, 2): 0.0024428, (4, 1): dm2_sterile}).get_m2(),
+    mixing_matrix=Mixing(n_neutrinos=4, mixing_angles=angles, dirac_phases=phases).build_mixing_matrix(),
+    m2_list=Spectrum(n_neutrinos=4, m_lightest=0., dm2={(2, 1): 7.42e-5, (3, 2): 0.0024428, (4, 1): dm2_sterile}).get_m2(),
     backend=torch_backend
 )
 xp = osc.backend.xp
@@ -50,8 +49,8 @@ osc.energy_sampler = energy_sampler_sqrt
 osc.n_samples = nSamples_E
 P_mumu = osc.probability(
     L_km=fixed_L, E_GeV=E_GeV_list,
-    alpha=flavors.muon,
-    beta=flavors.muon, # muon could be sterile
+    flavor_emit=flavors.muon,
+    flavor_det=flavors.muon, # muon could be sterile
     antineutrino=False
 )
 

@@ -1,8 +1,7 @@
-from __future__ import annotations
+from nu_waves.hamiltonian.matter_constant import MatterLayer, MatterProfile
 from dataclasses import dataclass
 import numpy as np
 
-from .profile import MatterLayer, MatterProfile
 
 @dataclass
 class PREMModel:
@@ -131,7 +130,7 @@ class PREMModel:
                     r_mid = r_of_t(0.5 * (t0 + t1))
                     rho_mid = float(self.rho(r_mid))
                     Ye_mid = float(self.Ye(r_mid))
-                    layers.append(MatterLayer(rho_mid, Ye_mid, dL, "absolute"))
+                    layers.append(MatterLayer(rho_mid, Ye_mid, dL))
 
             elif scheme == "hist_density":
                 t_edges = np.linspace(-half, +half, n_bins + 1)
@@ -151,7 +150,7 @@ class PREMModel:
                 def flush():
                     nonlocal accL, accR, accY
                     if accL > 0.0:
-                        layers.append(MatterLayer(accR / accL, accY / accL, accL, "absolute"))
+                        layers.append(MatterLayer(accR / accL, accY / accL, accL))
                         accL = accR = accY = 0.0
 
                 for i in range(len(dL)):
@@ -167,12 +166,12 @@ class PREMModel:
                     merged = [layers[0]]
                     for nxt in layers[1:]:
                         cur = merged[-1]
-                        if abs(nxt.rho_gcm3 - cur.rho_gcm3) <= merge_tol:
+                        if abs(nxt.rho_in_g_per_cm3 - cur.rho_in_g_per_cm3) <= merge_tol:
                             Lsum = cur.weight + nxt.weight
                             merged[-1] = MatterLayer(
-                                (cur.rho_gcm3 * cur.weight + nxt.rho_gcm3 * nxt.weight) / Lsum,
+                                (cur.rho_in_g_per_cm3 * cur.weight + nxt.rho_in_g_per_cm3 * nxt.weight) / Lsum,
                                 (cur.Ye * cur.weight + nxt.Ye * nxt.weight) / Lsum,
-                                Lsum, "absolute"
+                                Lsum
                             )
                         else:
                             merged.append(nxt)
@@ -184,7 +183,7 @@ class PREMModel:
         # --- Atmosphere around the Earth chord (both signs of cosz) ---
         L_atm = self._atm_path_km(cosz, h_atm_km)
         if L_atm > 0.0:
-            atm = MatterLayer(0.0, self.Ye_mantle, L_atm, "absolute")
+            atm = MatterLayer(0.0, self.Ye_mantle, L_atm)
             if Ltot > 0.0:  # upgoing: atmosphere is on the FAR side, before Earth
                 layers = [atm] + layers
             else:  # downgoing: atmosphere is on the NEAR side, straight to detector
@@ -192,6 +191,6 @@ class PREMModel:
 
         # Ensure non-empty profile to keep the engine happy
         if not layers:
-            layers = [MatterLayer(0.0, self.Ye_mantle, 0.0, "absolute")]
+            layers = [MatterLayer(0.0, self.Ye_mantle, 0.0)]
 
-        return MatterProfile(layers)
+        return MatterProfile(layers=layers, slicing="absolute")

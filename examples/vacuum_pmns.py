@@ -3,34 +3,49 @@ import os
 import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import Oscillator
+from nu_waves.hamiltonian import vacuum
+from nu_waves.globals.backend import Backend
+from nu_waves.propagation.new_oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
+import time
+
+
+# import torch
+# Backend.set_api(torch, device='mps')
+
+nPoints = int(1E6)
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}
-pmns = Mixing(dim=3, mixing_angles=angles, dirac_phases=phases)
-U_pmns = pmns.get_mixing_matrix()
-print(np.round(U_pmns, 3))
-
 # Masses, normal ordering
-spec = Spectrum(n=3, m_lightest=0.)
-spec.set_dm2({(2, 1): 7.42e-5, (3, 2): 0.0024428})
-spec.summary()
+dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428}
 
-osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2())
+h = vacuum.Hamiltonian(
+    mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=3, m_lightest=0, dm2=dm2),
+    antineutrino=False
+)
+osc = Oscillator(hamiltonian=h)
 
 # Compute probabilities:
 # α = 1 (νμ source), β = [1,2,3] → (νμ, νe, ντ)
 E_min, E_max = 0.2, 3.0
-Enu_list = np.linspace(E_min, E_max, 200)
+Enu_list = np.linspace(E_min, E_max, nPoints)
+
+t0 = time.perf_counter()
 P = osc.probability(
     L_km=295, E_GeV=Enu_list,
-    alpha=flavors.muon,
-    beta=[flavors.electron, flavors.muon, flavors.tau],
+    flavor_emit=flavors.muon,
+    flavor_det=[flavors.electron, flavors.muon, flavors.tau],
     antineutrino=False
 )
+t1 = time.perf_counter()
+print(f"Execution time: {t1 - t0:.3f} s")
+
+if nPoints > int(1E5):
+    exit(0)
 
 # ----------------------------------------------------------------------
 # Plotting

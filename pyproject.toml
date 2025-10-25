@@ -25,25 +25,11 @@ classifiers = [
 ]
 dependencies = [
   "numpy>=1.24",
-  "torch>=2.0; platform_machine!='wasm32'",
-  "tqdm",
 ]
 
 [project.optional-dependencies]
-torch = ["torch>=2.0; platform_machine!='wasm32'"]  # optional backend
-plot = ["matplotlib>=3.7"]
-dev = [
-  "pytest>=7",
-  "pytest-cov",
-  "ruff",
-  "mypy",
-  "build",
-  "twine",
-  "numpy",
-  "torch",
-  "matplotlib",
-  "tqdm",
-]
+torch = ["torch>=2.0"] # `pip install nu-waves[torch]` but not strictly a dependency
+dev = ["matplotlib>=3.7","torch>=2.0", "pytest", "pytest-cov"] # CI will install: `pip install .[dev]`
 
 
 [project.urls]
