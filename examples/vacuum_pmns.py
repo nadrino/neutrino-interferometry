@@ -39,7 +39,6 @@ P = osc.probability(
     L_km=295, E_GeV=Enu_list,
     flavor_emit=flavors.muon,
     flavor_det=[flavors.electron, flavors.muon, flavors.tau],
-    antineutrino=False
 )
 t1 = time.perf_counter()
 print(f"Execution time: {t1 - t0:.3f} s")

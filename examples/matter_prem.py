@@ -2,6 +2,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import os
+import time
 
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
@@ -33,7 +34,7 @@ phases = {(1, 3): np.deg2rad(195)}
 # Masses, normal ordering
 dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428}
 
-h_matter = matter_constant.Hamiltonian(
+h_matter = matter.Hamiltonian(
     mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
     spectrum=Spectrum(n_neutrinos=3, m_lightest=0, dm2=dm2),
     antineutrino=False
@@ -54,6 +55,7 @@ P_mumu     = np.zeros_like(P_mue)
 P_mue_bar  = np.zeros_like(P_mue)
 P_mumu_bar = np.zeros_like(P_mue)
 
+t0 = time.perf_counter()
 for iy, cosz in tqdm(enumerate(cosz_binning), total=len(cosz_binning)):
     # 1) build PREM profile for this cos(zenith)
     cosz_profile = prem.profile_from_coszen(
@@ -75,6 +77,9 @@ for iy, cosz in tqdm(enumerate(cosz_binning), total=len(cosz_binning)):
 
     P_mue[iy], P_mumu[iy] = P_mu_i[..., 0], P_mu_i[..., 1]
     P_mue_bar[iy], P_mumu_bar[iy] = P_mubar_i[..., 0], P_mubar_i[..., 1]
+
+t1 = time.perf_counter()
+print(f"Computation time: {t1 - t0:.3f} s")
 
 E_edges  = np.geomspace(E_GeV.min(), E_GeV.max(), E_GeV.size + 1)
 CZ_edges = np.linspace(cosz_binning.min(), cosz_binning.max(), cosz_binning.size + 1)

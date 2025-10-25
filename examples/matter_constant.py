@@ -25,12 +25,12 @@ h_vacuum = vacuum.Hamiltonian(
     antineutrino=False
 )
 
-h_matter_constant = matter_constant.Hamiltonian(
+h_matter = matter.Hamiltonian(
     mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
     spectrum=Spectrum(n_neutrinos=3, m_lightest=0, dm2=dm2),
     antineutrino=False
 )
-h_matter_constant.set_constant_density(rho_in_g_per_cm3=0.)
+h_matter.set_constant_density(rho_in_g_per_cm3=0.)
 
 
 # calculate without matter effects
@@ -38,7 +38,7 @@ osc = Oscillator(hamiltonian=h_vacuum)
 P_vacuum = osc.probability(L_km=295, E_GeV=np.linspace(0.2, 2, 50), flavor_emit=flavors.muon, flavor_det=flavors.electron)
 
 # compare with density = 0
-osc.hamiltonian = h_matter_constant
+osc.hamiltonian = h_matter
 P_zero_density = osc.probability(L_km=295, E_GeV=np.linspace(0.2, 2, 50), flavor_emit=flavors.muon, flavor_det=flavors.electron)
 
 # should be equal
@@ -53,17 +53,17 @@ rho_gcm3, Ye = 2.8, 0.5        # average crust density and electron fraction
 E = np.linspace(0.2, 5.0, 600) # GeV
 
 # --- Vacuum probabilities ---
-# h_matter_constant.set_constant_density(rho_in_g_per_cm3=rho_gcm3, Ye=0.5)
+# h_matter.set_constant_density(rho_in_g_per_cm3=rho_gcm3, Ye=0.5)
 osc.hamiltonian = h_vacuum
 P_mue_vac = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)   # νμ→νe
 
 # --- Constant-density matter probabilities ---
-osc.hamiltonian = h_matter_constant
-h_matter_constant.set_constant_density(rho_in_g_per_cm3=rho_gcm3, Ye=0.5)
+osc.hamiltonian = h_matter
+h_matter.set_constant_density(rho_in_g_per_cm3=rho_gcm3, Ye=0.5)
 P_mue_matt = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)
 
 # --- (optional) antineutrinos for comparison ---
-h_matter_constant.set_antineutrino(True)
+h_matter.set_antineutrino(True)
 P_muebar_matt = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)
 
 # --- Plot ---
@@ -84,8 +84,8 @@ plt.show()
 
 
 # inverted ordering
-h_matter_constant.spectrum.set_dm2({(2, 1): 7.42e-5, (3, 2): -0.0024428})
-h_matter_constant.set_antineutrino(False)
+h_matter.spectrum.set_dm2({(2, 1): 7.42e-5, (3, 2): -0.0024428})
+h_matter.set_antineutrino(False)
 P_mue_matt_inv = osc.probability(L_km=L_km, E_GeV=E, flavor_emit=1, flavor_det=0)
 
 plt.figure(figsize=(7,4.2))
