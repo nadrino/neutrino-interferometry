@@ -68,19 +68,14 @@ for iy, cosz in tqdm(enumerate(cosz_binning), total=len(cosz_binning)):
     L_tot = float(sum(layer.weight for layer in cosz_profile.layers))
 
     # 3) compute ν and ν̄ for the two channels
+    osc.hamiltonian.set_antineutrino(False)
     P_mu_i    = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=[0, 1])
+
+    osc.hamiltonian.set_antineutrino(True)
     P_mubar_i = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=[0, 1])
 
     P_mue[iy], P_mumu[iy] = P_mu_i[..., 0], P_mu_i[..., 1]
     P_mue_bar[iy], P_mumu_bar[iy] = P_mubar_i[..., 0], P_mubar_i[..., 1]
-
-# (optional) synchronize GPU timing before plotting
-try:
-    import torch
-    if torch.backends.mps.is_available(): torch.mps.synchronize()
-    elif torch.cuda.is_available():       torch.cuda.synchronize()
-except Exception:
-    pass
 
 E_edges  = np.geomspace(E_GeV.min(), E_GeV.max(), E_GeV.size + 1)
 CZ_edges = np.linspace(cosz_binning.min(), cosz_binning.max(), cosz_binning.size + 1)
