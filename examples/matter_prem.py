@@ -5,112 +5,74 @@ import os
 
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.propagation.oscillator import Oscillator
+from nu_waves.hamiltonian import matter_constant
+from nu_waves.propagation.new_oscillator import Oscillator
 from nu_waves.matter.prem import PREMModel
 from nu_waves.matter.profile import MatterProfile
 import nu_waves.utils.style
 
-# toggle for CPU/GPU
-# torch_backend = None
-torch_backend = make_torch_backend(seed=0, use_complex64=True)
+
+from nu_waves.globals.backend import Backend
+import torch
+Backend.set_api(torch, device='mps')
+
+
+E_GeV = np.logspace(-1, 2, 400)     # x
+cosz_binning  = np.linspace(-1.0, 1.0, 200)     # y (upgoing)
+prem  = PREMModel()
 
 # choose one:
-# SCHEME = "prem_layers"      # exact PREM shells
+# SCHEME = "prem_layers"  # exact PREM shells
 SCHEME = "hist_density"   # fine histogram of density along path
-
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}
-pmns = Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases)
-U_pmns = pmns.build_mixing_matrix()
-
 # Masses, normal ordering
-spec = Spectrum(n_neutrinos=3, m_lightest=0.)
-spec._generate_dm2_matrix({(2, 1): 7.42e-5, (3, 2): 0.0024428})
+dm2 = {(2, 1): 7.42e-5, (3, 2): 0.0024428}
 
-osc = Oscillator(mixing_matrix=U_pmns, m2_list=spec.get_m2(), backend=torch_backend)
-
-# sanity test for layer ordering
-prof = MatterProfile.from_segments(
-    rho_gcm3=[2.8, 11.0], Ye=[0.5, 0.467], lengths_km=[3000.0, 2000.0]
+h_matter = matter_constant.Hamiltonian(
+    mixing=Mixing(n_neutrinos=3, mixing_angles=angles, dirac_phases=phases),
+    spectrum=Spectrum(n_neutrinos=3, m_lightest=0, dm2=dm2),
+    antineutrino=False
 )
-osc.set_layered_profile(prof)
-E = np.linspace(2,8,200)
-P_fwd = osc.probability(L_km=sum(l.weight for l in prof.layers), E_GeV=E, flavor_emit=1, flavor_det=0)
-
-# reverse the profile
-prof_rev = MatterProfile.from_segments(
-    rho_gcm3=[11.0, 2.8], Ye=[0.467, 0.5], lengths_km=[2000.0, 3000.0]
-)
-osc.set_layered_profile(prof_rev)
-P_rev = osc.probability(L_km=sum(l.weight for l in prof_rev.layers), E_GeV=E, flavor_emit=1, flavor_det=0)
-
-print("max |ΔP| (fwd vs rev) =", np.max(np.abs(P_fwd - P_rev)))  # should be >> 1e-3
-
-L = 8000.0
-E = np.linspace(1, 10, 400)
-P_NO = osc.probability(L_km=L, E_GeV=E, flavor_emit=1, flavor_det=0)              # neutrinos, NO
-P_IO = osc.probability(L_km=L, E_GeV=E, flavor_emit=1, flavor_det=0, antineutrino=True)  # ν̄ in IO has the resonance
-
-print("P_mu->e max (NO, ν):", P_NO.max(), "  P_mu->e max (IO, ν̄):", P_IO.max())
-
-E_GeV = np.logspace(-1, 2, 400)     # x
-cosz  = np.linspace(-1.0, 1.0, 200)     # y (upgoing)
-prem  = PREMModel()
-
-xp = osc.backend.xp
-def e_smear(E_center, n, a=0.01):
-    E = xp.asarray(E_center, dtype=float)
-    sigma = a * E
-    out = xp.normal(loc=E[..., None], scale=sigma[..., None], size=E.shape + (n,))
-    return out
-
-osc.energy_sampler = e_smear
-osc.n_samples = 50
+osc = Oscillator(hamiltonian=h_matter)
 
 # test for thickness
-prof = prem.profile_from_coszen(+0.3, h_atm_km=15.0)
-print("L_tot(downgoing) =", sum(L.weight for L in prof.layers))  # ≈ 15 km
+cosz_profile = prem.profile_from_coszen(+0.3, h_atm_km=15.0)
+print("L_tot(downgoing) =", sum(L.weight for L in cosz_profile.layers))  # ≈ 15 km
 
-for cz in (-1e-3, +1e-3):
-    prof = prem.profile_from_coszen(cz, h_atm_km=15.0)
-    print(cz, "L_atm =",
-          sum(L.weight for L in prof.layers if L.rho_gcm3==0.0))
+for cosz in (-1e-3, +1e-3):
+    cosz_profile = prem.profile_from_coszen(cosz, h_atm_km=15.0)
+    print(cosz, "L_atm =", sum(layer.weight for layer in cosz_profile.layers if layer.rho_in_g_per_cm3 == 0.0))
 
 prof1 = prem.profile_from_coszen(-1, scheme="prem_layers")
 prof2 = prem.profile_from_coszen(-1, scheme="hist_density", n_bins=4000, nbins_density=60)
-osc.set_layered_profile(prof1); P1 = osc.probability(L_km=sum(l.weight for l in prof1.layers), E_GeV=E, flavor_emit=1, flavor_det=0)
-osc.set_layered_profile(prof2); P2 = osc.probability(L_km=sum(l.weight for l in prof2.layers), E_GeV=E, flavor_emit=1, flavor_det=0)
-
-print("max |ΔP| prem vs hist =", np.max(np.abs(P1-P2)))
 
 # --- arrays to hold all 4 panels ---
-P_mue      = np.zeros((len(cosz), len(E_GeV)))
+P_mue      = np.zeros((len(cosz_binning), len(E_GeV)))
 P_mumu     = np.zeros_like(P_mue)
 P_mue_bar  = np.zeros_like(P_mue)
 P_mumu_bar = np.zeros_like(P_mue)
 
-for iy, cz in tqdm(enumerate(cosz), total=len(cosz)):
+for iy, cosz in tqdm(enumerate(cosz_binning), total=len(cosz_binning)):
     # 1) build PREM profile for this cos(zenith)
-    prof = prem.profile_from_coszen(
-        cz, scheme=SCHEME,
+    cosz_profile = prem.profile_from_coszen(
+        cosz, scheme=SCHEME,
         n_bins=1200, nbins_density=36, merge_tol=0.0,  # keep your knobs
-        h_atm_km=15.0                                   # thin atmosphere (your choice)
+        h_atm_km=15.0                                  # thin atmosphere
     )
-    osc.set_layered_profile(prof)
+    h_matter.set_matter_profile(cosz_profile)
 
     # 2) total baseline for this row (sum of absolute segments)
-    L_tot = float(sum(layer.weight for layer in prof.layers))
+    L_tot = float(sum(layer.weight for layer in cosz_profile.layers))
 
     # 3) compute ν and ν̄ for the two channels
-    P_mue_i      = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=0, antineutrino=False)
-    P_mumu_i     = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=1, antineutrino=False)
-    P_mue_bar_i  = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=0, antineutrino=True)
-    P_mumu_bar_i = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=1, antineutrino=True)
+    P_mu_i    = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=[0, 1])
+    P_mubar_i = osc.probability(L_km=L_tot, E_GeV=E_GeV, flavor_emit=1, flavor_det=[0, 1])
 
-    P_mue[iy], P_mumu[iy] = P_mue_i, P_mumu_i
-    P_mue_bar[iy], P_mumu_bar[iy] = P_mue_bar_i, P_mumu_bar_i
+    P_mue[iy], P_mumu[iy] = P_mu_i[..., 0], P_mu_i[..., 1]
+    P_mue_bar[iy], P_mumu_bar[iy] = P_mubar_i[..., 0], P_mubar_i[..., 1]
 
 # (optional) synchronize GPU timing before plotting
 try:
@@ -121,7 +83,7 @@ except Exception:
     pass
 
 E_edges  = np.geomspace(E_GeV.min(), E_GeV.max(), E_GeV.size + 1)
-CZ_edges = np.linspace(cosz.min(),  cosz.max(),  cosz.size  + 1)
+CZ_edges = np.linspace(cosz_binning.min(), cosz_binning.max(), cosz_binning.size + 1)
 
 def draw_panel(ax, Z, label_tex, text_color, fontsize=20):
     pc = ax.pcolormesh(
