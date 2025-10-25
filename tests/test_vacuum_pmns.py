@@ -2,7 +2,7 @@ import numpy as np
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.hamiltonian import vacuum
-from nu_waves.propagation.new_oscillator import Oscillator
+from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.utils.flavors import electron, muon, tau
 from nu_waves.globals.backend import Backend
 

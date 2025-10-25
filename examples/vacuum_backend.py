@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.hamiltonian import vacuum
-from nu_waves.propagation.new_oscillator import Oscillator
+from nu_waves.propagation.oscillator import Oscillator
 import nu_waves.utils.flavors as flavors
 
 from nu_waves.globals.backend import Backend
