@@ -18,12 +18,14 @@ Backend.set_api(torch, device='mps')
 
 
 E_GeV = np.logspace(-1, 2, 400)     # x
-cosz_binning  = np.linspace(-1.0, 1.0, 200)     # y (upgoing)
+cosz_binning  = np.linspace(-1.0, 1.0, 400)     # y (upgoing)
 prem  = PREMModel()
 
 # choose one:
-# SCHEME = "prem_layers"  # exact PREM shells
+# SCHEME = "prem_layers"      # PREM shells
 SCHEME = "hist_density"   # fine histogram of density along path
+n_bins_layers = 1000
+n_bins_density = 100 #
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
@@ -46,9 +48,6 @@ for cosz in (-1e-3, +1e-3):
     cosz_profile = prem.profile_from_coszen(cosz, h_atm_km=15.0)
     print(cosz, "L_atm =", sum(layer.weight for layer in cosz_profile.layers if layer.rho_in_g_per_cm3 == 0.0))
 
-prof1 = prem.profile_from_coszen(-1, scheme="prem_layers")
-prof2 = prem.profile_from_coszen(-1, scheme="hist_density", n_bins=4000, nbins_density=60)
-
 # --- arrays to hold all 4 panels ---
 P_mue      = np.zeros((len(cosz_binning), len(E_GeV)))
 P_mumu     = np.zeros_like(P_mue)
@@ -59,7 +58,7 @@ for iy, cosz in tqdm(enumerate(cosz_binning), total=len(cosz_binning)):
     # 1) build PREM profile for this cos(zenith)
     cosz_profile = prem.profile_from_coszen(
         cosz, scheme=SCHEME,
-        n_bins=1200, nbins_density=36, merge_tol=0.0,  # keep your knobs
+        n_bins=n_bins_layers, nbins_density=n_bins_density, merge_tol=0.0,  # keep your knobs
         h_atm_km=15.0                                  # thin atmosphere
     )
     h_matter.set_matter_profile(cosz_profile)
