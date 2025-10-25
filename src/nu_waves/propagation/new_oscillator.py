@@ -22,7 +22,7 @@ class Oscillator:
     def __init__(self, hamiltonian: HamiltonianBase):
         self.hamiltonian = hamiltonian
 
-    def probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None, antineutrino=False):
+    def probability(self, L_km, E_GeV, flavor_emit=None, flavor_det=None):
         # unify array format
         L, E = self._generate_L_and_E_arrays(L_km, E_GeV)
         flavor_emit = self._format_flavor_arg(flavor_emit)
@@ -34,12 +34,12 @@ class Oscillator:
         E = E * GEV_TO_EV
 
         # compute probabilities
-        out = self._probability(L=L, E=E, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino)
+        out = self._probability(L=L, E=E, flavor_emit=flavor_emit, flavor_det=flavor_det)
 
         # back to CPU
         return Backend.from_device(self._squeeze_array(out))
 
-    def probability_sampled(self, L_km, E_GeV, n_samples, flavor_emit=None, flavor_det=None, antineutrino=False, E_sample_fct=None, L_sample_fct=None):
+    def probability_sampled(self, L_km, E_GeV, n_samples, flavor_emit=None, flavor_det=None, E_sample_fct=None, L_sample_fct=None):
         if E_sample_fct is None and L_sample_fct is None:
             raise ValueError("Must specify either E_sample_fct or L_sample_fct")
 
@@ -60,7 +60,7 @@ class Oscillator:
         E_sampled = E_sampled * GEV_TO_EV       # (nE*n_samples,)
 
         # compute probability
-        P_sampled = self._probability(L=L_sampled, E=E_sampled, flavor_emit=flavor_emit, flavor_det=flavor_det, antineutrino=antineutrino)
+        P_sampled = self._probability(L=L_sampled, E=E_sampled, flavor_emit=flavor_emit, flavor_det=flavor_det)
 
         # perform the averaging over n_samples
         nFe, nFd = P_sampled.shape[-2], P_sampled.shape[-1]
@@ -68,14 +68,14 @@ class Oscillator:
         P_sampled = Backend.xp().mean(P_sampled, axis=1)  # (nE, nFe, nFd)
         return Backend.from_device(self._squeeze_array(P_sampled))
 
-    def generate_initial_state(self, flavor_emit, E_GeV, antineutrino=False):
+    def generate_initial_state(self, flavor_emit, E_GeV):
         E = Backend.xp().asarray(E_GeV) * GEV_TO_EV
         return Backend.from_device(
-            self._generate_initial_state(flavor_emit=flavor_emit, E=E, antineutrino=antineutrino)
+            self._generate_initial_state(flavor_emit=flavor_emit, E=E)
         )
 
-    def _probability(self, L, E, flavor_emit, flavor_det, antineutrino):
-        psi = self._generate_initial_state(flavor_emit=flavor_emit, E=E, antineutrino=antineutrino)
+    def _probability(self, L, E, flavor_emit, flavor_det):
+        psi = self._generate_initial_state(flavor_emit=flavor_emit, E=E)
         self.hamiltonian.propagate_state(psi=psi, L=L, E=E) # return the state in flavor basis
 
         nF = self.hamiltonian.n_neutrinos
@@ -85,7 +85,7 @@ class Oscillator:
         amp = psi.values @ Backend.xp().conjugate(flavor_det_vecs.T)
         return Backend.xp().abs(amp)**2
 
-    def _generate_initial_state(self, flavor_emit, E, antineutrino) -> WaveFunction:
+    def _generate_initial_state(self, flavor_emit, E) -> WaveFunction:
         xp = Backend.xp()
         nE = E.shape[0]
         nF = self.hamiltonian.n_neutrinos
@@ -100,8 +100,7 @@ class Oscillator:
         # Create the holder
         return WaveFunction(
             current_basis=Basis.FLAVOR,
-            values=psi,
-            antineutrino=antineutrino
+            values=psi
         )
 
     def _generate_L_and_E_arrays(self, L_km, E_GeV):

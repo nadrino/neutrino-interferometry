@@ -14,7 +14,6 @@ class Basis(Enum):
 class WaveFunction:
     current_basis: Basis
     values: any                 # complex xp.ndarray (NumPy or Torch). Shape: (nE, nF)
-    antineutrino: Bool = False  # are antineutrino?
     eigen_vectors: any = None   # optional: eigenvector matrix defining this basis (nF, nF)
 
     def __post_init__(self):
@@ -32,7 +31,6 @@ class WaveFunction:
     def copy(self, xp):
         return WaveFunction(
             current_basis=self.current_basis,
-            antineutrino=self.antineutrino,
             values=xp.copy(self.values),
             eigen_vectors=None if self.eigen_vectors is None else xp.copy(self.eigen_vectors),
         )
