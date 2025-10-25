@@ -5,7 +5,7 @@ from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.hamiltonian import vacuum
 from nu_waves.hamiltonian import matter_constant
-from nu_waves.propagation.new_oscillator import Oscillator
+from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.globals.backend import Backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
