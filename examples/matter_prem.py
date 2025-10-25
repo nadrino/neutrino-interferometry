@@ -5,7 +5,7 @@ import os
 
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
-from nu_waves.hamiltonian import matter_constant
+from nu_waves.hamiltonian import matter
 from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.matter.prem import PREMModel
 from nu_waves.matter.profile import MatterProfile

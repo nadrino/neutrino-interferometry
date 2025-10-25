@@ -1,4 +1,4 @@
-from nu_waves.hamiltonian.matter_constant import MatterLayer, MatterProfile
+from nu_waves.hamiltonian.matter import MatterLayer, MatterProfile
 from dataclasses import dataclass
 import numpy as np
 
