@@ -1,6 +1,8 @@
 from nu_waves.hamiltonian.matter import MatterLayer, MatterProfile
+from nu_waves.globals.backend import Backend
 from dataclasses import dataclass
-import numpy as np
+
+xp = Backend().xp()
 
 
 @dataclass
@@ -22,10 +24,10 @@ class PREMModel:
     Ye_core:   float = 0.467
 
     # --- PREM density polynomials ρ(r) in g/cm^3; x = r/R_earth ---
-    def rho(self, r_km: np.ndarray) -> np.ndarray:
-        r = np.asarray(r_km, float)
+    def rho(self, r_km: xp.ndarray) -> xp.ndarray:
+        r = xp.asarray(r_km, float)
         x = r / self.R_earth_km
-        rho = np.empty_like(x)
+        rho = xp.empty_like(x)
 
         # regions defined by r
         b = self.prem_boundaries_km
@@ -72,10 +74,10 @@ class PREMModel:
 
         return rho
 
-    def Ye(self, r_km: np.ndarray) -> np.ndarray:
+    def Ye(self, r_km: xp.ndarray) -> xp.ndarray:
         """Simple two-zone Ye: core vs mantle/crust."""
-        r = np.asarray(r_km, float)
-        return np.where(r <= 3480.0, self.Ye_core, self.Ye_mantle)
+        r = xp.asarray(r_km, float)
+        return xp.where(r <= 3480.0, self.Ye_core, self.Ye_mantle)
 
     # --- chord geometry helpers ---
     def _chord_length_km(self, cosz: float) -> float:
@@ -84,7 +86,7 @@ class PREMModel:
 
     def _impact_parameter_km(self, cosz: float) -> float:
         cz = float(cosz)
-        return self.R_earth_km * np.sqrt(max(0.0, 1.0 - cz*cz))
+        return self.R_earth_km * xp.sqrt(max(0.0, 1.0 - cz*cz))
 
     # atmosphere thickness
     def _atm_path_km(self, cosz: float, h_km: float) -> float:
@@ -93,7 +95,7 @@ class PREMModel:
         b = self._impact_parameter_km(cosz)
         if b >= Rp:  # ray misses the atmosphere
             return 0.0
-        seg = lambda r: np.sqrt(max(r * r - b * b, 0.0))
+        seg = lambda r: xp.sqrt(max(r * r - b * b, 0.0))
         # ONE segment from production altitude Rp down to the surface R, irrespective of sign(cosz)
         return seg(Rp) - seg(R)
 
@@ -115,16 +117,16 @@ class PREMModel:
             half = 0.5 * Ltot
 
             def r_of_t(t):
-                return np.sqrt(b * b + t * t)
+                return xp.sqrt(b * b + t * t)
 
             if scheme == "prem_layers":
                 # cut at PREM boundaries intersected by the chord
                 t_pts = [-half, +half]
                 for rb in self.prem_boundaries_km[1:-1]:
                     if rb > b:
-                        dt = np.sqrt(rb * rb - b * b)
+                        dt = xp.sqrt(rb * rb - b * b)
                         t_pts += [-dt, +dt]
-                t_pts = np.array(sorted(tp for tp in t_pts if -half <= tp <= half))
+                t_pts = xp.array(sorted(tp for tp in t_pts if -half <= tp <= half))
                 for t0, t1 in zip(t_pts[:-1], t_pts[1:]):
                     dL = float(t1 - t0)
                     r_mid = r_of_t(0.5 * (t0 + t1))
@@ -133,16 +135,16 @@ class PREMModel:
                     layers.append(MatterLayer(rho_mid, Ye_mid, dL))
 
             elif scheme == "hist_density":
-                t_edges = np.linspace(-half, +half, n_bins + 1)
+                t_edges = xp.linspace(-half, +half, n_bins + 1)
                 t_mid = 0.5 * (t_edges[:-1] + t_edges[1:])
-                dL = np.diff(t_edges)
+                dL = xp.diff(t_edges)
                 r_mid = r_of_t(t_mid)
                 rho_mid = self.rho(r_mid)
                 Ye_mid = self.Ye(r_mid)
 
                 rmin, rmax = rho_mid.min(), rho_mid.max()
-                edges = np.linspace(rmin, rmax, nbins_density + 1)
-                idx = np.minimum(np.searchsorted(edges, rho_mid, side="right") - 1, nbins_density - 1)
+                edges = xp.linspace(rmin, rmax, nbins_density + 1)
+                idx = xp.minimum(xp.searchsorted(edges, rho_mid, side="right") - 1, nbins_density - 1)
 
                 accL = accR = accY = 0.0
                 prev = idx[0]
