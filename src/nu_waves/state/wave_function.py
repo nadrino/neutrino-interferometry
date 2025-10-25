@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from tomlkit.items import Bool
-
 
 class Basis(Enum):
     MASS = "mass"               # natural base for neutrino propagation
