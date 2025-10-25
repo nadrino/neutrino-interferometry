@@ -1,4 +1,4 @@
-import numpy as np
+from nu_waves.globals.backend import Backend
 
 
 class Spectrum:
@@ -49,7 +49,7 @@ class Spectrum:
             spec.set_dm2({(2,1): 7.4e-5, (3,1): 2.517e-3})
         """
         # init
-        self._dm2_matrix = np.zeros((self._n_neutrinos, self._n_neutrinos), dtype=float)
+        self._dm2_matrix = Backend.xp().zeros((self._n_neutrinos, self._n_neutrinos), dtype=float)
 
         # leave is not set
         if self._dm2_dict is None:
@@ -95,7 +95,7 @@ class Spectrum:
 
         n = self.n_neutrinos
         tol = 1e-10
-        M = np.copy(self._dm2_matrix)
+        M = Backend.xp().copy(self._dm2_matrix)
 
         # --- 1. Direct injection of user values ---
         for (i, j), val in self._dm2_dict.items():
@@ -106,25 +106,25 @@ class Spectrum:
         adjacency = {k: set() for k in range(n)}
         for i in range(n):
             for j in range(n):
-                if not np.isnan(M[i, j]) and abs(M[i, j]) > 0:
+                if not Backend.xp().isnan(M[i, j]) and abs(M[i, j]) > 0:
                     adjacency[i].add(j)
 
         # --- 3. Choose a reference (first connected node) ---
         ref = 0
         visited = {ref}
         queue = [ref]
-        delta = np.zeros(n)
-        delta[:] = np.nan
+        delta = Backend.xp().zeros(n)
+        delta[:] = Backend.xp().nan
         delta[ref] = 0.0
 
         # --- 4. Propagate Δ_i = Δm²_{i,ref} using BFS ---
         while queue:
             j = queue.pop(0)
             for k in adjacency[j]:
-                if np.isnan(M[k, j]):
+                if Backend.xp().isnan(M[k, j]):
                     continue
                 new_val = delta[j] + M[k, j]
-                if np.isnan(delta[k]):
+                if Backend.xp().isnan(delta[k]):
                     delta[k] = new_val
                     visited.add(k)
                     queue.append(k)
@@ -133,7 +133,7 @@ class Spectrum:
                     if abs(delta[k] - new_val) > tol:
                         delta[k] = 0.5 * (delta[k] + new_val)  # smooth correction
 
-        if np.any(np.isnan(delta)):
+        if Backend.xp().any(Backend.xp().isnan(delta)):
             raise ValueError("Incomplete Δm² network: some states are disconnected.")
 
         # --- 5. Fill / correct all entries by transitivity ---
@@ -143,7 +143,7 @@ class Spectrum:
                     M[i, j] = 0.0
                     continue
                 expected = delta[i] - delta[j]
-                if np.isnan(M[i, j]) or abs(M[i, j] - expected) > tol:
+                if Backend.xp().isnan(M[i, j]) or abs(M[i, j] - expected) > tol:
                     M[i, j] = expected
                     M[j, i] = -expected
 
@@ -170,36 +170,36 @@ class Spectrum:
 
         # --- identify lightest state (min mean Δm²) ---
         # For a consistent antisymmetric M, the lightest has negative mean shifts
-        mean_shift = np.mean(M, axis=1)
-        ref = np.argmin(mean_shift)  # index of lightest (0-based)
+        mean_shift = Backend.xp().mean(M, axis=1)
+        ref = Backend.xp().argmin(mean_shift)  # index of lightest (0-based)
 
         # --- reconstruct absolute m² values ---
         m2_lightest = self._m_lightest ** 2
         m2 = m2_lightest + M[:, ref]
 
         # --- sanity checks ---
-        if np.any(m2 < -1e-18):
+        if Backend.xp().any(m2 < -1e-18):
             raise ValueError(f"Inconsistent Δm² matrix: negative m² values found {m2}")
 
         return m2
 
     def get_m(self):
-        return np.sqrt(self.get_m2())
+        return Backend.xp().sqrt(self.get_m2())
 
     # ---------- Utilities ----------
     def summary(self):
         print(f"Spectrum with {self.n_neutrinos} mass states:")
         print(f"  Lightest mass = {self._m_lightest:.6f} eV")
-        print(f"  Masses = {np.round(self.get_m(), 6)} eV")
+        print(f"  Masses = {Backend.xp().round(self.get_m(), 6)} eV")
         print("Δm² matrix [eV²]:")
-        print(np.round(self._dm2_matrix, 6))
+        print(Backend.xp().round(self._dm2_matrix, 6))
 
 
 if __name__ == "__main__":
 
     print("Providing 2,1 and 3,1:")
     spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
-    spec._generate_dm2_matrix({
+    spec.set_dm2({
         (2, 1): 7.42e-5,
         (3, 1): 2.517e-3
     })
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     # coherence tests
     print("Providing 2,1 and 3,2:")
     spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
-    spec._generate_dm2_matrix({
+    spec.set_dm2({
         (2, 1): 7.42e-5,
         (3, 2): 0.0024428
     })
@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
     print("Providing 3,1 and 3,2:")
     spec = Spectrum(n_neutrinos=3, m_lightest=0.01)
-    spec._generate_dm2_matrix({
+    spec.set_dm2({
         (3, 1): 2.517e-3,
         (3, 2): 0.0024428
     })
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     print("Δm²_32 =", spec.get_dm2(3, 2))
 
     print("Inverted ordering:")
-    spec._generate_dm2_matrix({
+    spec.set_dm2({
         (2, 1): 7.42e-5,
         (3, 1): -2.517e-3
     })
@@ -243,7 +243,7 @@ if __name__ == "__main__":
 
     print("With sterile:")
     spec = Spectrum(n_neutrinos=4, m_lightest=0.01)
-    spec._generate_dm2_matrix({
+    spec.set_dm2({
         (3, 1): 2.517e-3,
         (3, 2): 0.0024428,
         (4, 1): 1,
