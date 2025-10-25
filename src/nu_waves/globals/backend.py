@@ -11,9 +11,24 @@ class Backend:
     @classmethod
     def set_api(cls, module, device=None, real_dtype=None, complex_dtype=None):
         """Set xp backend: numpy, torch, cupy, jax.numpy, etc."""
+        _real_dtype = real_dtype if real_dtype is not None else cls._real_dtype
+        _complex_dtype = complex_dtype if complex_dtype is not None else cls._complex_dtype
         if module.__name__ == "torch":
             from nu_waves.backends.torch_backend import TorchBackend
             cls._current_api = TorchBackend()
+            if device is not None:
+                device = cls._current_api.device(device)
+            else:
+                print("Auto-selecting torch device")
+                if cls._current_api.cuda.is_available():
+                    device = cls._current_api.device("cuda")  # NVIDIA GPU
+                elif cls._current_api.backends.mps.is_available():
+                    device = cls._current_api.device("mps")  # Apple Silicon GPU
+                else:
+                    device = cls._current_api.device("cpu")  # Fallback
+
+            print("Using device:", device)
+            cls._device = device
         else:
             cls._current_api = module
 
