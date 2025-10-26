@@ -9,26 +9,17 @@ class Backend:
     _device = None  # e.g. "cuda", "cpu", "mps"
 
     @classmethod
-    def set_api(cls, module, device=None, real_dtype=None, complex_dtype=None):
+    def set_api(cls, module, device=None):
         """Set xp backend: numpy, torch, cupy, jax.numpy, etc."""
-        _real_dtype = real_dtype if real_dtype is not None else cls._real_dtype
-        _complex_dtype = complex_dtype if complex_dtype is not None else cls._complex_dtype
         if module.__name__ == "torch":
             from nu_waves.backends.torch_backend import TorchBackend
-            cls._current_api = TorchBackend()
-            if device is not None:
-                device = cls._current_api.device(device)
-            else:
-                print("Auto-selecting torch device")
-                if cls._current_api.cuda.is_available():
-                    device = cls._current_api.device("cuda")  # NVIDIA GPU
-                elif cls._current_api.backends.mps.is_available():
-                    device = cls._current_api.device("mps")  # Apple Silicon GPU
-                else:
-                    device = cls._current_api.device("cpu")  # Fallback
+            cls._current_api = TorchBackend(device=device)
+            cls._device = cls._current_api.device
 
-            print("Using device:", device)
-            cls._device = device
+            if device == "mps":
+                # Apple MPS backend currently limited to 32-bit
+                cls._real_dtype = "float32"
+                cls._complex_dtype = "complex64"
         else:
             cls._current_api = module
 
