@@ -22,6 +22,14 @@ class Backend:
                 # Apple MPS backend currently limited to 32-bit
                 cls._real_dtype = "float32"
                 cls._complex_dtype = "complex64"
+        elif cls._api_name == "jax":
+            from nu_waves.backends.jax_backend import JaxBackend
+            cls._current_api = JaxBackend(device=device)
+            cls._device = cls._current_api.device
+            # To ensure identical numerical behavior across all devices,
+            # JAX defaults to float32 everywhere, even on CPU.
+            cls._real_dtype = "float32"
+            cls._complex_dtype = "complex64"
         else:
             cls._current_api = module
 
