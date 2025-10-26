@@ -59,5 +59,5 @@ class WaveFunction:
         """
         # H' = U† H U  → ψ' = U† ψ
         # (nE, nFe, nF) @ (nF, nF) -> (nE, nFe, nF)
-        self.values = Backend.xp().matmul(self.values, eigen_vectors)
+        self.values = self.values @ eigen_vectors
         self.current_basis = target_basis
