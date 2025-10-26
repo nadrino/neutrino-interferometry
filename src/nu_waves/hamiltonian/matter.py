@@ -82,8 +82,12 @@ class Hamiltonian(HamiltonianBase):
         m2 = xp.asarray(self.spectrum.get_m2(), dtype=U.dtype)
         H_vacuum_eV2 = U @ xp.diag(m2) @ Ud
 
-        flavor_projector = xp.zeros((self.n_neutrinos, self.n_neutrinos), dtype=U.dtype)
+        import numpy as np
+        flavor_projector = np.zeros((self.n_neutrinos, self.n_neutrinos), dtype=np.complex128)
         flavor_projector[0, 0] = 1.0  # only electron neutrinos feel the potential
+
+        # transferring back to device if needed
+        flavor_projector = xp.asarray(flavor_projector, dtype=Backend.complex_dtype())
 
         signA = -1.0 if self._antineutrino else 1.0
         inv2E = (0.5 / E)[:, None, None] # used for the hamiltonian

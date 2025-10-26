@@ -93,10 +93,14 @@ class Spectrum:
           - Missing entries are inferred from transitivity.
           - Slight inconsistencies are corrected (auto-heal).
         """
+        import numpy as np
+        xp = np
+        # xp = Backend.xp()
 
         n = self.n_neutrinos
         tol = 1e-10
-        M = Backend.xp().copy(self._dm2_matrix)
+        self._dm2_matrix = Backend.from_device(self._dm2_matrix)
+        M = xp.copy(self._dm2_matrix)
 
         # --- 1. Direct injection of user values ---
         for (i, j), val in self._dm2_dict.items():
@@ -107,25 +111,25 @@ class Spectrum:
         adjacency = {k: set() for k in range(n)}
         for i in range(n):
             for j in range(n):
-                if not Backend.xp().isnan(M[i, j]) and abs(M[i, j]) > 0:
+                if not xp.isnan(M[i, j]) and abs(M[i, j]) > 0:
                     adjacency[i].add(j)
 
         # --- 3. Choose a reference (first connected node) ---
         ref = 0
         visited = {ref}
         queue = [ref]
-        delta = Backend.xp().zeros(n)
-        delta[:] = Backend.xp().nan
+        delta = xp.zeros(n)
+        delta[:] = xp.nan
         delta[ref] = 0.0
 
         # --- 4. Propagate Δ_i = Δm²_{i,ref} using BFS ---
         while queue:
             j = queue.pop(0)
             for k in adjacency[j]:
-                if Backend.xp().isnan(M[k, j]):
+                if xp.isnan(M[k, j]):
                     continue
                 new_val = delta[j] + M[k, j]
-                if Backend.xp().isnan(delta[k]):
+                if xp.isnan(delta[k]):
                     delta[k] = new_val
                     visited.add(k)
                     queue.append(k)
@@ -134,7 +138,7 @@ class Spectrum:
                     if abs(delta[k] - new_val) > tol:
                         delta[k] = 0.5 * (delta[k] + new_val)  # smooth correction
 
-        if Backend.xp().any(Backend.xp().isnan(delta)):
+        if xp.any(xp.isnan(delta)):
             raise ValueError("Incomplete Δm² network: some states are disconnected.")
 
         # --- 5. Fill / correct all entries by transitivity ---
@@ -144,12 +148,13 @@ class Spectrum:
                     M[i, j] = 0.0
                     continue
                 expected = delta[i] - delta[j]
-                if Backend.xp().isnan(M[i, j]) or abs(M[i, j] - expected) > tol:
+                if xp.isnan(M[i, j]) or abs(M[i, j] - expected) > tol:
                     M[i, j] = expected
                     M[j, i] = -expected
 
         # --- 6. Final antisymmetrization & store ---
         self._dm2_matrix = 0.5 * (M - M.T)
+        self._dm2_matrix = Backend.xp().asarray(self._dm2_matrix)
 
     def get_dm2_matrix(self):
         return self._dm2_matrix
@@ -166,13 +171,14 @@ class Spectrum:
         The reference state (lightest) is identified automatically
         as the one with the smallest average m² offset.
         """
+        xp = Backend.xp()
         M = self._dm2_matrix
         n = M.shape[0]
 
         # --- identify lightest state (min mean Δm²) ---
         # For a consistent antisymmetric M, the lightest has negative mean shifts
-        mean_shift = Backend.xp().mean(M, axis=1)
-        ref = Backend.xp().argmin(mean_shift)  # index of lightest (0-based)
+        mean_shift = xp.mean(M, axis=1)
+        ref = xp.argmin(mean_shift)  # index of lightest (0-based)
 
         # --- reconstruct absolute m² values ---
         m2_lightest = self._m_lightest ** 2
@@ -185,15 +191,17 @@ class Spectrum:
         return m2
 
     def get_m(self):
-        return Backend.xp().sqrt(self.get_m2())
+        xp = Backend.xp()
+        return xp.sqrt(self.get_m2())
 
     # ---------- Utilities ----------
     def summary(self):
+        xp = Backend.xp()
         print(f"Spectrum with {self.n_neutrinos} mass states:")
         print(f"  Lightest mass = {self._m_lightest:.6f} eV")
-        print(f"  Masses = {Backend.xp().round(self.get_m(), 6)} eV")
+        print(f"  Masses = {xp.round(self.get_m(), 6)} eV")
         print("Δm² matrix [eV²]:")
-        print(Backend.xp().round(self._dm2_matrix, 6))
+        print(xp.round(self._dm2_matrix, 6))
 
 
 if __name__ == "__main__":
