@@ -15,6 +15,10 @@ import time
 # Backend.set_api(torch, device='mps')
 # Backend.set_api(torch, device='cpu')
 
+# import jax
+# Backend.set_api(jax, device='mps')
+# Backend.set_api(jax, device='cpu')
+
 nPoints = int(1E5)
 
 # 3 flavors PMNS, PDG values (2025)
@@ -45,6 +49,7 @@ t1 = time.perf_counter()
 print(f"Execution time: {t1 - t0:.3f} s")
 
 if nPoints > int(1E5):
+    print(f"Number of points: {nPoints} -> SKIPPING PLOT GENERATION")
     exit(0)
 
 # ----------------------------------------------------------------------

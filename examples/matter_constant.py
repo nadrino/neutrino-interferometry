@@ -13,6 +13,10 @@ import nu_waves.utils.style
 import torch
 Backend.set_api(torch, device='mps')
 
+# import jax
+# Backend.set_api(jax, device='mps')
+# Backend.set_api(jax, device='cpu')
+
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}

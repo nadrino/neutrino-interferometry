@@ -30,9 +30,14 @@ class Mixing:
         for any dim >= 3. All remaining rotations (e.g. with sterile states)
         are then applied in the user-provided insertion order.
         """
-        xp = Backend.xp()
-        complex_type = Backend.complex_dtype()
-        real_type = Backend.real_dtype()
+        import numpy as np
+        xp = np
+        complex_type = np.complex128
+        real_type = np.float64
+
+        # xp = Backend.xp()
+        # complex_type = Backend.complex_dtype()
+        # real_type = Backend.real_dtype()
 
         # # force CPU?
         # xp = np

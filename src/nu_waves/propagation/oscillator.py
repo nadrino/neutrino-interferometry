@@ -85,16 +85,24 @@ class Oscillator:
         return prob
 
     def _generate_initial_state(self, flavor_emit, E) -> WaveFunction:
-        xp = Backend.xp()
+        import numpy as np
+        xp = np
+        complex_type = np.complex128
+
+        # xp = Backend.xp()
+        # complex_type = Backend.complex_dtype()
+
         nE = E.shape[0]
         nF = self.hamiltonian.n_neutrinos
         nFe = len(flavor_emit)
 
         # Create zero-filled wavefunction array
-        psi = xp.zeros((nE, nFe, nF), dtype=Backend.complex_dtype())
+        psi = xp.zeros((nE, nFe, nF), dtype=complex_type)
 
         # Set the emitted flavor amplitude to 1
         psi[:, xp.arange(nFe), flavor_emit] = 1.0
+
+        psi = Backend.xp().asarray(psi, dtype=Backend.complex_dtype())
 
         # Create the holder
         return WaveFunction(
