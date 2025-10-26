@@ -1,13 +1,52 @@
-import torch
+
 
 class TorchBackend:
 
     def __init__(self, device=None):
-        self._device = device or torch.device("cpu")
+        import torch
+        self.xp = torch
+        self.linalg = self._make_linalg_namespace()
+        self._device = device or self.xp.device("cpu")
 
         print("Using device:", self._device)
+        # faster?
+        # self.xp.autograd.grad_mode.inference_mode(mode=False)
         pass
-        # torch.autograd.grad_mode.inference_mode(mode=False)
+
+    # ------------------------------------------------------------------
+    # Custom linear algebra namespace
+    # ------------------------------------------------------------------
+    def _make_linalg_namespace(self):
+        class _Linalg:
+            pass
+
+        L = _Linalg()
+
+        # fallback reference to native torch.linalg
+        L._torch_linalg = self.xp.linalg
+
+        # transparent eigh override
+        def eigh(H):
+            """Safe Hermitian eigendecomposition, MPS-aware and analytic for 2x2/3x3."""
+            nF = H.shape[-1]
+            device = getattr(H, "device", None)
+            if device is not None and device.type == "mps":
+                # Analytic 2x2 / 3x3
+                # if nF == 2:
+                #     return TorchBackend._eigh_2x2(H)
+                # elif nF == 3 and False: # DISABLED
+                #     return TorchBackend._eigh_3x3(H)
+                # CPU fallback for larger matrices
+                # print(f"[WARN] eigh not defined on device: {device}. Using CPU fallback.")
+                H_cpu = H.to("cpu")
+                vals, vecs = self.xp.linalg.eigh(H_cpu)
+                return vals.to("mps"), vecs.to("mps")
+            # other devices (cuda/cpu) → native
+            return self.xp.linalg.eigh(H)
+
+        L.eigh = eigh
+
+        return L
 
     @property
     def device(self):
@@ -16,27 +55,27 @@ class TorchBackend:
     """Subset of Array-API interface mapped to torch."""
     def __getattr__(self, name):
         # delegate to torch if it exists
-        if hasattr(torch, name):
-            return getattr(torch, name)
+        if hasattr(self.xp, name):
+            return getattr(self.xp, name)
         raise AttributeError(f"TorchCompat: torch has no attribute '{name}'")
 
     # explicit overrides for missing Array API functions
     def asarray(self, x, dtype=None):
-        return torch.as_tensor(x, device=self.device, dtype=dtype)
+        return self.xp.as_tensor(x, device=self.device, dtype=dtype)
 
     def copy(self, x):
         return x.clone()
 
     def eye(self, n, m=None, dtype=None):
-        return torch.eye(n, m or n,
+        return self.xp.eye(n, m or n,
                          device=self._device,
                          dtype=dtype or self._default_dtype)
 
     def zeros(self, shape, dtype=None):
-        return torch.zeros(shape, device=self.device, dtype=dtype)
+        return self.xp.zeros(shape, device=self.device, dtype=dtype)
 
     def conjugate(self, x):
-        return torch.conj(x)
+        return self.xp.conj(x)
 
     def ndim(self, x):
         """Return number of dimensions of tensor."""
@@ -50,13 +89,13 @@ class TorchBackend:
         """Return total number of elements or along a given dimension."""
         if dim is not None:
             return x.shape[dim]
-        # flatten torch.Size to int
-        return int(torch.tensor(x.numel()).item())
+        # flatten self.xp.Size to int
+        return int(self.xp.tensor(x.numel()).item())
 
     def repeat(self, a, repeats, axis=None):
         """NumPy-style repeat for torch backend."""
-        if not torch.is_tensor(a):
-            a = torch.as_tensor(a)
+        if not self.xp.is_tensor(a):
+            a = self.xp.as_tensor(a)
 
         if axis is None:
             # Flatten then repeat globally
@@ -71,15 +110,15 @@ class TorchBackend:
             if len(repeats) != a.size(axis):
                 raise ValueError("len(repeats) must match dimension length")
             # Build index for repeat_interleave
-            idx = torch.arange(a.size(axis), device=a.device).repeat_interleave(
-                torch.as_tensor(repeats, device=a.device))
-            return torch.index_select(a, axis, idx)
+            idx = self.xp.arange(a.size(axis), device=a.device).repeat_interleave(
+                self.xp.as_tensor(repeats, device=a.device))
+            return self.xp.index_select(a, axis, idx)
 
     class _Random:
         def standard_normal(self, shape):
             from nu_waves.globals.backend import Backend
             device = Backend.device() if hasattr(Backend, "device") else "cpu"
-            return torch.randn(shape, device=device)
+            return Backend.xp().randn(shape, device=device)
 
     random = _Random()
 
