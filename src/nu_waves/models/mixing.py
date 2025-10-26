@@ -1,5 +1,7 @@
 from nu_waves.globals.backend import Backend
+
 from dataclasses import dataclass, field
+import numpy as np
 
 
 class Mixing:
@@ -28,7 +30,16 @@ class Mixing:
         for any dim >= 3. All remaining rotations (e.g. with sterile states)
         are then applied in the user-provided insertion order.
         """
-        U = Backend.xp().eye(self.n_neutrinos, dtype=Backend.complex_dtype())
+        xp = Backend.xp()
+        complex_type = Backend.complex_dtype()
+        real_type = Backend.real_dtype()
+
+        # # force CPU?
+        # xp = np
+        # complex_type = np.complex128
+        # real_type = np.float64
+
+        U = xp.eye(self.n_neutrinos, dtype=complex_type)
 
         # Build the ordered list of rotation pairs to apply (right-multiplication)
         provided = list(self.mixing_angles.keys())  # preserves insertion order (Py3.7+)
@@ -44,28 +55,29 @@ class Mixing:
 
         # Apply rotations in that order (right-multiply: rotations act on mass columns)
         for (i, j) in angles_ordered:
-            theta = Backend.xp().asarray(self.mixing_angles[(i, j)], dtype=Backend.real_dtype())
-            delta = Backend.xp().asarray(self.dirac_phases.get((i, j), 0.0), dtype=Backend.real_dtype())
-            s, c = Backend.xp().sin(theta), Backend.xp().cos(theta)
+            theta = xp.asarray(self.mixing_angles[(i, j)], dtype=real_type)
+            delta = xp.asarray(self.dirac_phases.get((i, j), 0.0), dtype=real_type)
+            s, c = xp.sin(theta), xp.cos(theta)
 
-            R = Backend.xp().eye(self.n_neutrinos, dtype=Backend.complex_dtype())
+            R = xp.eye(self.n_neutrinos, dtype=complex_type)
             ii, jj = i - 1, j - 1
             R[ii, ii] = c
             R[jj, jj] = c
             # PDG sign convention (R23 has -s in (3,2); implemented generically here)
-            R[ii, jj] = s * Backend.xp().exp(-1j * delta)
-            R[jj, ii] = -s * Backend.xp().exp(+1j * delta)
+            R[ii, jj] = s * xp.exp(-1j * delta)
+            R[jj, ii] = -s * xp.exp(+1j * delta)
 
             U = U @ R
 
         if include_majorana and any(self.majorana_phases):
             # Majorana phases: dim-1 physical phases (first one conventionally 0)
             phases = [0.0] + list(self.majorana_phases)
-            phases = Backend.xp().array(phases[:self.n_neutrinos], dtype=float)  # trim/pad
-            M = Backend.xp().diag(Backend.xp().exp(0.5j * phases))
+            phases = xp.array(phases[:self.n_neutrinos], dtype=float)  # trim/pad
+            M = xp.diag(xp.exp(0.5j * phases))
             U = U @ M
 
-        return U
+        # make sure it is returned on the right device
+        return Backend.xp().asarray(U, dtype=Backend.complex_dtype())
 
 
 # inline example
