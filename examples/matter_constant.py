@@ -10,8 +10,8 @@ from nu_waves.globals.backend import Backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
-# import torch
-# Backend.set_api(torch, device='mpi')
+import torch
+Backend.set_api(torch, device='mps')
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
@@ -44,7 +44,7 @@ P_zero_density = osc.probability(L_km=295, E_GeV=np.linspace(0.2, 2, 50), flavor
 # should be equal
 delta = np.abs(P_vacuum - P_zero_density)
 print(delta)
-np.testing.assert_allclose(delta, 0, atol=1e-15)
+np.testing.assert_allclose(delta, 0, atol=1e-7)
 
 
 # --- DUNE-like configuration ---
