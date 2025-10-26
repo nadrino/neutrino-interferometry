@@ -18,6 +18,10 @@ import nu_waves.utils.style
 # Backend.set_api(torch, device='mps') # no eigen decompose in MPS, will fallback to CPU
 # Backend.set_api(torch, device='cpu') # fastest
 
+# import jax
+# Backend.set_api(jax, device='mps')
+# Backend.set_api(jax, device='cpu')
+
 
 E_GeV = np.logspace(-1, 2, 400)     # x
 cosz_binning  = np.linspace(-1.0, 1.0, 200)     # y (upgoing)

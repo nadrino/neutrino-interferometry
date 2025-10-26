@@ -8,12 +8,19 @@ from nu_waves.propagation.oscillator import Oscillator
 from nu_waves.globals.backend import Backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
+import time
 
-# import torch
+
+import torch
 # Backend.set_api(torch, device='mps')
+# Backend.set_api(torch, device='cpu')
+
+# import jax
+# Backend.set_api(jax, device='mps')
+# Backend.set_api(jax, device='cpu')
 
 nBins_L = 200
-nSamples_E = 100000
+nSamples_E = int(1E6)
 E_res = 0.1
 
 # 3 flavors PMNS, PDG values (2025)
@@ -50,7 +57,7 @@ def gaussian_E_sampler(E, n_samples, sigma_rel=E_res):
     out = E[:, None] + noise
     return xp.maximum(out, xp.asarray(1e-12, dtype=Backend.real_dtype()))
 
-
+t0 = time.perf_counter()
 P_damp = osc.probability_sampled(
     L_km=L_list, E_GeV=E_fixed,
     flavor_emit=flavors.electron,
@@ -58,7 +65,8 @@ P_damp = osc.probability_sampled(
     n_samples=nSamples_E,
     E_sample_fct=gaussian_E_sampler,
 )
-
+t1 = time.perf_counter()
+print(f"Execution time: {t1 - t0:.3f} s")
 
 # ----------------------------------------------------------------------
 # Plotting

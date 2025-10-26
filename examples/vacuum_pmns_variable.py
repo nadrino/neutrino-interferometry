@@ -4,13 +4,16 @@ from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.hamiltonian import vacuum
 from nu_waves.propagation.oscillator import Oscillator
+from nu_waves.globals.backend import Backend
 import nu_waves.utils.flavors as flavors
 import nu_waves.utils.style
 
-from nu_waves.globals.backend import Backend
-import torch
-Backend.set_api(torch, device='mps')
+# import torch
+# Backend.set_api(torch, device='mps')
 
+# import jax
+# Backend.set_api(jax, device='mps')
+# Backend.set_api(jax, device='cpu')
 
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}
 phases = {(1, 3): np.deg2rad(195)}
