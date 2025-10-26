@@ -31,7 +31,7 @@ class MatterProfile:
         Ls = [MatterLayer(r, y, L) for r, y, L in zip(rho_gcm3, Ye, lengths_km)]
         return MatterProfile(Ls, "absolute")
 
-    def resolve_dL(self, L_in_eV_inv) -> list[Backend.xp().ndarray]:
+    def resolve_dL(self, L_in_eV_inv):
         """
         Map total baselines (array-like) to per-layer ΔL_k arrays.
         Returns list of arrays, one per layer, each shaped like L_total_km_array.
