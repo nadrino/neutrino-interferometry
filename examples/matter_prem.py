@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import os
 import time
 
+from nu_waves.globals.backend import Backend
 from nu_waves.models.mixing import Mixing
 from nu_waves.models.spectrum import Spectrum
 from nu_waves.hamiltonian import matter
@@ -13,9 +14,9 @@ from nu_waves.matter.profile import MatterProfile
 import nu_waves.utils.style
 
 
-from nu_waves.globals.backend import Backend
-import torch
+# import torch
 # Backend.set_api(torch, device='mps')
+# Backend.set_api(torch, device='cpu')
 
 
 E_GeV = np.logspace(-1, 2, 400)     # x
