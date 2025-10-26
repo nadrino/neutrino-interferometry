@@ -39,8 +39,13 @@ class TorchBackend:
                 # CPU fallback for larger matrices
                 # print(f"[WARN] eigh not defined on device: {device}. Using CPU fallback.")
                 H_cpu = H.to("cpu")
+                # use double precision instead
+                H_cpu = self.xp.asarray(H_cpu, device="cpu", dtype=self.xp.complex128)
                 vals, vecs = self.xp.linalg.eigh(H_cpu)
-                return vals.to("mps"), vecs.to("mps")
+                # explicitly downcast *on CPU* before returning to MPS
+                vals = vals.to(dtype=self.xp.complex64).to(H.device)
+                vecs = vecs.to(dtype=self.xp.complex64).to(H.device)
+                return vals, vecs
             # other devices (cuda/cpu) → native
             return self.xp.linalg.eigh(H)
 
