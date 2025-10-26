@@ -71,7 +71,7 @@ class Hamiltonian(HamiltonianBase):
         self._matter_profile = matter_profile
 
     def get_barger_propagator(self, L, E):
-        xp = Backend().xp()
+        xp = Backend.xp()
 
         # make sure they are matching the backend (no copy if already matching)
         E = xp.asarray(E)
