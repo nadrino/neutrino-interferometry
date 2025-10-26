@@ -65,6 +65,6 @@ plt.ylim(0, 1.05)
 plt.legend()
 plt.tight_layout()
 
-plt.savefig("../figures/vacuum_pmns.jpg", dpi=150)  if not os.environ.get("CI") else None
+plt.savefig("./figures/vacuum_pmns.jpg", dpi=150)  if not os.environ.get("CI") else None
 plt.show()
 

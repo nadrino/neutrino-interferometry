@@ -79,7 +79,7 @@ plt.xlim(E.min(), E.max())
 plt.ylim(0, 0.3)
 plt.legend(ncol=2, frameon=False)
 plt.tight_layout()
-plt.savefig("../figures/matter_vacuum_vs_matter.jpg", dpi=150)  if not os.environ.get("CI") else None
+plt.savefig("./figures/matter_vacuum_vs_matter.jpg", dpi=150)  if not os.environ.get("CI") else None
 plt.show()
 
 
@@ -100,6 +100,6 @@ plt.ylim(0, 0.3)
 plt.legend(ncol=2, frameon=False)
 plt.tight_layout()
 
-plt.savefig("../figures/matter_constant_test.jpg", dpi=150)  if not os.environ.get("CI") else None
+plt.savefig("./figures/matter_constant_test.jpg", dpi=150)  if not os.environ.get("CI") else None
 plt.show()
 

@@ -75,7 +75,7 @@ plt.minorticks_on()
 plt.tight_layout()
 
 plt.tight_layout()
-# plt.savefig("../figures/sterile_raa_plot.jpg", dpi=150)  if not os.environ.get("CI") else None
+plt.savefig("./figures/sterile_raa_plot.jpg", dpi=150)  if not os.environ.get("CI") else None
 plt.show()
 
 

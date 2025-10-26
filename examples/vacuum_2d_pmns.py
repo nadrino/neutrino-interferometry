@@ -84,7 +84,7 @@ fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), constrained_layout=True)
 plot_oscillogram(axes[0], E_vals, L_vals, P_mue,  r"$P(\nu_\mu\to\nu_e)$")
 plot_oscillogram(axes[1], E_vals, L_vals, P_mumu, r"$P(\nu_\mu\to\nu_\mu)$")
 
-# plt.savefig("../figures/vacuum_2d_pmns.pdf") # too heavy
-plt.savefig("../figures/vacuum_2d_pmns.jpg", dpi=150) if not os.environ.get("CI") else None
+# plt.savefig("./figures/vacuum_2d_pmns.pdf") # too heavy
+plt.savefig("./figures/vacuum_2d_pmns.jpg", dpi=150) if not os.environ.get("CI") else None
 plt.show()
 

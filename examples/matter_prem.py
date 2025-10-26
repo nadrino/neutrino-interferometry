@@ -131,6 +131,6 @@ for ax in axs[:,0]:
 cbar = fig.colorbar(m0, ax=axs, location="right", fraction=0.05, pad=0.03)
 cbar.set_label("Oscillation probability", labelpad=10, fontsize=13)
 
-# plt.savefig("../figures/matter_prem_test.pdf") # too heavy
-plt.savefig("../figures/matter_prem_test.jpg", dpi=150) if not os.environ.get("CI") else None
+plt.savefig("./figures/matter_prem_test.pdf") # too heavy
+plt.savefig("./figures/matter_prem_test.jpg", dpi=150) if not os.environ.get("CI") else None
 plt.show()
