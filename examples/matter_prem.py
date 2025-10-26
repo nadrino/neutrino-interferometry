@@ -15,7 +15,7 @@ import nu_waves.utils.style
 
 from nu_waves.globals.backend import Backend
 import torch
-Backend.set_api(torch, device='mps')
+# Backend.set_api(torch, device='mps')
 
 
 E_GeV = np.logspace(-1, 2, 400)     # x
