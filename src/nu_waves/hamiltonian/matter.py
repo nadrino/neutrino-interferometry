@@ -88,6 +88,14 @@ class Hamiltonian(HamiltonianBase):
         signA = -1.0 if self._antineutrino else 1.0
         inv2E = (0.5 / E)[:, None, None] # used for the hamiltonian
 
+        def calc_S(L_, rho_, Ye_):
+            matter_potential = signA * (VCOEFF_EV * rho_ * Ye_)
+            H = H_vacuum_eV2[None, ...] * inv2E + matter_potential * flavor_projector[None, ...]
+            eigen_values, eigen_vectors = xp.linalg.eigh(H)
+            phases = xp.exp((-1j) * eigen_values * L_[..., None])
+            S = (eigen_vectors * phases[:, None, :]) @ xp.matrix_transpose(xp.conjugate(eigen_vectors))
+            return S
+
         if self._matter_profile is not None:
             L_slices = self._matter_profile.resolve_dL(L)
             # Create a (1, n_nu, n_nu) identity matrix in complex dtype for initialization
@@ -95,19 +103,9 @@ class Hamiltonian(HamiltonianBase):
             # Broadcast the identity across all energies and make it writable (hence the .copy)
             S = xp.copy(xp.broadcast_to(S, (E.shape[0], self.n_neutrinos, self.n_neutrinos)))
             for k, layer in enumerate(self._matter_profile.layers):
-                matter_potential = signA * (VCOEFF_EV * layer.rho_in_g_per_cm3 * layer.Ye)
-                H = H_vacuum_eV2[None, ...] * inv2E + matter_potential * flavor_projector[None, ...]
-                eigen_values, eigen_vectors = xp.linalg.eigh(H)
-                phases = xp.exp((-1j) * eigen_values * L_slices[k][..., None])
-                Sk = (eigen_vectors * phases[:, None, :]) @ xp.conjugate(eigen_vectors).mT
-                S = Sk @ S
+                S = calc_S(L_slices[k], layer.rho_in_g_per_cm3, layer.Ye) @ S
         else:
             rho, Ye = self._constant_profile
-            matter_potential = signA * (VCOEFF_EV * rho * Ye)
-            H = H_vacuum_eV2[None, ...] * inv2E + matter_potential * flavor_projector[None, ...]
-
-            eigen_values, eigen_vectors = xp.linalg.eigh(H)
-            phases = xp.exp(-1j * eigen_values * L[..., None])
-            S = (eigen_vectors * phases[:, None, :]) @ xp.conjugate(eigen_vectors).mT
+            S = calc_S(L, rho, Ye)
 
         return S
