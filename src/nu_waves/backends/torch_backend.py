@@ -40,12 +40,12 @@ class TorchBackend:
                 # print(f"[WARN] eigh not defined on device: {device}. Using CPU fallback.")
                 H_cpu = H.to("cpu")
                 # use double precision instead
-                H_cpu = self.xp.asarray(H_cpu, device="cpu", dtype=self.xp.complex128)
+                # H_cpu = self.xp.asarray(H_cpu, device="cpu", dtype=self.xp.complex128)
                 vals, vecs = self.xp.linalg.eigh(H_cpu)
                 # explicitly downcast *on CPU* before returning to MPS
                 vals = vals.to(dtype=self.xp.complex64).to(H.device)
                 vecs = vecs.to(dtype=self.xp.complex64).to(H.device)
-                return vals, vecs
+                return vals.contiguous(), vecs.contiguous()
             # other devices (cuda/cpu) → native
             return self.xp.linalg.eigh(H)
 
@@ -68,6 +68,17 @@ class TorchBackend:
     def asarray(self, x, dtype=None):
         return self.xp.as_tensor(x, device=self.device, dtype=dtype)
 
+    def matrix_transpose(self, M):
+        """
+        Backend-agnostic matrix transpose (swap last two axes).
+        Preserves batch dimensions.
+        """
+        out = M.mT
+        if M.device is not None and M.device.type == "mps":
+            # force it not to be a view
+            out = out.contiguous()
+        return out
+
     def copy(self, x):
         return x.clone()
 
@@ -76,8 +87,10 @@ class TorchBackend:
                          device=self._device,
                          dtype=dtype or self._default_dtype)
 
-    def zeros(self, shape, dtype=None):
-        return self.xp.zeros(shape, device=self.device, dtype=dtype)
+    def zeros(self, shape, dtype=None, device=None):
+        if device is None:
+            device = self.device
+        return self.xp.zeros(shape, device=device, dtype=dtype)
 
     def conjugate(self, x):
         return self.xp.conj(x)
