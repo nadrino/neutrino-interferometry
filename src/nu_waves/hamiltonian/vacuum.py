@@ -27,7 +27,7 @@ class Hamiltonian(HamiltonianBase):
         if psi.current_basis == Basis.FLAVOR:
             psi.to_basis(
                 target_basis=Basis.MASS,
-                eigen_vectors_dagger=Ud
+                eigen_vectors=U
             )
 
         if psi.current_basis != Basis.MASS:
@@ -43,7 +43,7 @@ class Hamiltonian(HamiltonianBase):
         # convention
         psi.to_basis(
             target_basis=Basis.FLAVOR,
-            eigen_vectors_dagger=U
+            eigen_vectors=Ud
         )
 
     def get_barger_propagator(self, L, E):
@@ -55,6 +55,7 @@ class Hamiltonian(HamiltonianBase):
         phases = 1.267 * (L / E)[:, None] * self._spectrum.get_m2()[None, :]
         D = xp.exp(-1j * phases)
 
-        S = (U[None, :, :] * D[:, None, :]) @ Ud[None, :, :]
+        S = xp.matmul(U[None, :, :], xp.diag_embed(D))
+        S = xp.matmul(S, xp.conjugate(U.T)[None, :, :])
         return S
 

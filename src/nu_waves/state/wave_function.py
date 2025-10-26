@@ -1,3 +1,5 @@
+from nu_waves.globals.backend import Backend
+
 from dataclasses import dataclass
 from enum import Enum
 
@@ -26,26 +28,36 @@ class WaveFunction:
     def n_flavors(self):
         return self.shape[-1]
 
-    def copy(self, xp):
+    def copy(self):
+        xp = Backend.xp()
         return WaveFunction(
             current_basis=self.current_basis,
             values=xp.copy(self.values),
             eigen_vectors=None if self.eigen_vectors is None else xp.copy(self.eigen_vectors),
         )
 
-    def to_basis(self, target_basis: Basis, eigen_vectors_dagger):
+    def to_basis(self, target_basis: Basis, eigen_vectors):
         """
-        Rotate the wavefunction to a new basis defined by `eigen_vectors_dagger`.
+        Rotate the wavefunction to a new basis defined by `eigen_vectors`.
+
+        Math convention is to left multiply, but because of the data
+        structure holding the `nF` possible states on the right,
+        right multiplication is more natural. Left multiplication would
+        force ourselves to swap axis, which triggers a broadcasted,
+        non-contiguous multiplication that remains fragile in complex64 (MPS).
 
         Parameters
         ----------
         target_basis : Basis
             Target basis label (for bookkeeping)
-        eigen_vectors_dagger : xp.ndarray
-            Columns are eigen_vectors defining the *target* basis.
-            Shape (nF, nF).
+        eigen_vectors : xp.ndarray
+            Shape (nF, nF). Right multiplication assumed.
+
+        For instance, right multiplication assumes:
+            FLAVOR -> MASS: U
+            MASS -> FLAVOR: U_dagger
         """
         # H' = U† H U  → ψ' = U† ψ
-        # shapes: ( (nF, nF) @ (nE, nFd, nF, 1) ) -> (nE, nFd, nF, 1) -> (nE, nFd, nF)
-        self.values = (eigen_vectors_dagger @ self.values[..., None])[..., 0]
+        # (nE, nFe, nF) @ (nF, nF) -> (nE, nFe, nF)
+        self.values = Backend.xp().matmul(self.values, eigen_vectors)
         self.current_basis = target_basis
