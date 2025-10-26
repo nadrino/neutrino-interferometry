@@ -13,8 +13,9 @@ import time
 
 # import torch
 # Backend.set_api(torch, device='mps')
+# Backend.set_api(torch, device='cpu')
 
-nPoints = int(1E6)
+nPoints = int(1E5)
 
 # 3 flavors PMNS, PDG values (2025)
 angles = {(1, 2): np.deg2rad(33.4), (1, 3): np.deg2rad(8.6), (2, 3): np.deg2rad(49)}

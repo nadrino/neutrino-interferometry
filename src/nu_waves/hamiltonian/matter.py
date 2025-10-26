@@ -38,14 +38,14 @@ class MatterProfile:
         - fraction layers scale with L_total
         - absolute layers ignore L_total (assumed consistent with physics setup)
         """
-        Ltot = Backend.xp().asarray(L_in_eV_inv, float)
+        Ltot = Backend.xp().asarray(L_in_eV_inv, Backend.real_dtype())
         dLs = list()
         if self.slicing == "fraction":
             for layer in self.layers:
                 dLs.append(layer.weight * Ltot)
         elif self.slicing == "absolute":
             for layer in self.layers:
-                dLs.append(Backend.xp().full_like(Ltot, layer.weight * KM_TO_EVINV, dtype=float))
+                dLs.append(Backend.xp().full_like(Ltot, layer.weight * KM_TO_EVINV, dtype=Backend.real_dtype()))
         else:
             raise NotImplementedError("slicing must be 'fraction' or 'absolute'")
 

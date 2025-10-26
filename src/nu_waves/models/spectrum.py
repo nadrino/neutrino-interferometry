@@ -49,7 +49,8 @@ class Spectrum:
             spec.set_dm2({(2,1): 7.4e-5, (3,1): 2.517e-3})
         """
         # init
-        self._dm2_matrix = Backend.xp().zeros((self._n_neutrinos, self._n_neutrinos), dtype=float)
+        self._dm2_matrix = Backend.xp().zeros((self._n_neutrinos, self._n_neutrinos), dtype=Backend.real_dtype())
+        self._dm2_matrix = Backend.to_device(self._dm2_matrix)
 
         # leave is not set
         if self._dm2_dict is None:

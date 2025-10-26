@@ -28,7 +28,7 @@ class Mixing:
         for any dim >= 3. All remaining rotations (e.g. with sterile states)
         are then applied in the user-provided insertion order.
         """
-        U = Backend.xp().eye(self.n_neutrinos, dtype=Backend.xp().complex128)
+        U = Backend.xp().eye(self.n_neutrinos, dtype=Backend.complex_dtype())
 
         # Build the ordered list of rotation pairs to apply (right-multiplication)
         provided = list(self.mixing_angles.keys())  # preserves insertion order (Py3.7+)
@@ -44,11 +44,11 @@ class Mixing:
 
         # Apply rotations in that order (right-multiply: rotations act on mass columns)
         for (i, j) in angles_ordered:
-            theta = Backend.xp().asarray(self.mixing_angles[(i, j)])
-            delta = Backend.xp().asarray(self.dirac_phases.get((i, j), 0.0))
+            theta = Backend.xp().asarray(self.mixing_angles[(i, j)], dtype=Backend.real_dtype())
+            delta = Backend.xp().asarray(self.dirac_phases.get((i, j), 0.0), dtype=Backend.real_dtype())
             s, c = Backend.xp().sin(theta), Backend.xp().cos(theta)
 
-            R = Backend.xp().eye(self.n_neutrinos, dtype=Backend.xp().complex128)
+            R = Backend.xp().eye(self.n_neutrinos, dtype=Backend.complex_dtype())
             ii, jj = i - 1, j - 1
             R[ii, ii] = c
             R[jj, jj] = c
