@@ -4,6 +4,7 @@ import numpy as np
 # static class
 class Backend:
     _current_api = np  # default
+    _api_name = np.__name__
     _real_dtype = "float64"
     _complex_dtype = "complex128"
     _device = None  # e.g. "cuda", "cpu", "mps"
@@ -11,7 +12,8 @@ class Backend:
     @classmethod
     def set_api(cls, module, device=None):
         """Set xp backend: numpy, torch, cupy, jax.numpy, etc."""
-        if module.__name__ == "torch":
+        cls._api_name = module.__name__
+        if cls._api_name == "torch":
             from nu_waves.backends.torch_backend import TorchBackend
             cls._current_api = TorchBackend(device=device)
             cls._device = cls._current_api.device
