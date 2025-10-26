@@ -2,9 +2,16 @@ import torch
 
 class TorchBackend:
 
-    def __init__(self):
+    def __init__(self, device=None):
+        self._device = device or torch.device("cpu")
+
+        print("Using device:", self._device)
         pass
         # torch.autograd.grad_mode.inference_mode(mode=False)
+
+    @property
+    def device(self):
+        return self._device
 
     """Subset of Array-API interface mapped to torch."""
     def __getattr__(self, name):
@@ -15,10 +22,22 @@ class TorchBackend:
 
     # explicit overrides for missing Array API functions
     def asarray(self, x, dtype=None):
-        return torch.as_tensor(x, dtype=dtype)
+        return torch.as_tensor(x, device=self.device, dtype=dtype)
 
     def copy(self, x):
         return x.clone()
+
+    def eye(self, n, m=None, dtype=None):
+        """Return an identity matrix on the current device."""
+        return torch.eye(
+            n,
+            m if m is not None else n,
+            device=self._device,
+            dtype=dtype or self._default_dtype,
+        )
+
+    def zeros(self, shape, dtype=None):
+        return torch.zeros(shape, device=self.device, dtype=dtype)
 
     def conjugate(self, x):
         return torch.conj(x)
