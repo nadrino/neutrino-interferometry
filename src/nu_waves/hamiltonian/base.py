@@ -47,7 +47,8 @@ class HamiltonianBase(ABC):
                              "Override propagate_state in your subclass, or rotate ψ beforehand.")
 
         S = self.get_barger_propagator(L=L, E=E)
-        psi.values = (S[:, None, :, :] @ psi.values[..., :, None])[..., 0]
+        # psi.values = (S[:, None, :, :] @ psi.values[..., :, None])[..., 0]
+        psi.values = Backend.xp().matmul(psi.values, S)
 
     def _check_parameters(self):
         assert (self._spectrum.n_neutrinos == self._mixing.n_neutrinos)
