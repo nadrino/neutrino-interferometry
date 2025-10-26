@@ -78,12 +78,11 @@ class Oscillator:
         psi = self._generate_initial_state(flavor_emit=flavor_emit, E=E)
         self.hamiltonian.propagate_state(psi=psi, L=L, E=E) # return the state in flavor basis
 
-        nF = self.hamiltonian.n_neutrinos
-        nFd = len(flavor_det)
-        flavor_det_vecs = Backend.xp().zeros((nFd, nF), dtype=Backend.complex_dtype())
-        flavor_det_vecs[Backend.xp().arange(nFd), flavor_det] = 1.0  # (nFd, nF)
-        amp = psi.values @ Backend.xp().conjugate(flavor_det_vecs.T)
-        return Backend.xp().abs(amp)**2
+        # select the components we want
+        amp = psi.values[..., flavor_det]
+
+        prob = Backend.xp().abs(amp) ** 2
+        return prob
 
     def _generate_initial_state(self, flavor_emit, E) -> WaveFunction:
         xp = Backend.xp()
