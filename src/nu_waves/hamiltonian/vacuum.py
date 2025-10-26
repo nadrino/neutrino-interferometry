@@ -56,6 +56,6 @@ class Hamiltonian(HamiltonianBase):
         D = xp.exp(-1j * phases)
 
         S = xp.matmul(U[None, :, :], xp.diag_embed(D))
-        S = xp.matmul(S, xp.conjugate(U.T)[None, :, :])
+        S = xp.matmul(S, Ud[None, :, :])
         return S
 
